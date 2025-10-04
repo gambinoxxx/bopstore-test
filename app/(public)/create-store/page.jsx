@@ -38,20 +38,44 @@ export default function CreateStore() {
         // Logic to check if the store is already submitted
         const token = await getToken()
         try{
-            const {data } = await axios.get('/api/store/create', {headers: {Authorization: `Bearer ${token}`}})
+            const {data } = await axios.get('/api/store/create', {headers: 
+                {Authorization: `Bearer ${token}`}})
+                if (["approved", "rejected", "pending"].includes(data.status)){
+                    setStatus(data.status)
+                    setAlreadySubmitted(true)
+                    switch(data.status){
+                        case "approved":
+                            setMessage("Your store has been approved! you can now add product to your store from dashboard")
+                            setTimeout(() => router.push("/store"), 5000)
+                        break;
+                        case "rejected":
+                            setMessage(
+                        "your store request has been rejected ,contact the admin for more details")
+                        break;
+                        case "pending":
+                            setMessage(
+                        "your store request is pending , please wait for the admin to approve your request")
+                        break;
 
-        }catch (error ){
+                        default:
+                            break;
+                    }                                  
+                }else{
+                    setAlreadySubmitted(false)
+                }
 
+        }catch (error){
+            toast.error(error?.response?.data?.error || error.message)
         }
 
-
+        
         setLoading(false)
     }
-
+    
     const onSubmitHandler = async (e) => {
         e.preventDefault()
         if(!user){
-            return toast('please login to continue')
+            return toast("please login to continue", {icon: '🔐'})
         }
         try {
             const token = await getToken()
@@ -67,19 +91,23 @@ export default function CreateStore() {
             const {data} = await axios.post('/api/store/create', formData, 
                 {headers: {Authorization: `Bearer ${token}`}})
             toast.success(data.message)
+            await fetchSellerStatus()
         } catch(error){
             toast.error(error.response?.data?.error || error.message)
         }
     }
 
     useEffect(() => {
-        fetchSellerStatus()
-    }, [])
+        if(user){
+            fetchSellerStatus()
+        }
+    }, [user])
 
     if (!user){
         return (
-            <div className="min-h-[80vh] mx-6 flex items-center justify-center text-slate-400">
-                <h1 className="text-2xl sm:text-4xl font-semibold">please <span className="text-slate-500">Login</span>to continue</h1>
+            <div className="min-h-[80vh] mx-6 flex items-center justify-center 
+            text-slate-400">
+                <h1 className="text-2xl sm:text-4xl font-semibold">please <span className="text-slate-500">Login</span> to continue</h1>
             </div>
         )
 

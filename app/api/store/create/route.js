@@ -15,10 +15,33 @@ export async function POST(request){
         const username = formData.get("username")
         const description = formData.get("description")
         const email = formData.get("email")
-        const contract = formData.get("contract")
+        const contact = formData.get("contact")
         const address = formData.get("address")
         const image = formData.get("image")
-        if(!name || !username || !description || !email || !contract || !address || !image){
+
+        // Check each field individually and log which one is missing
+if (!name) {
+    console.log("Name is missing");
+}
+if (!username) {
+    console.log("Username is missing");
+}
+if (!description) {
+    console.log("Description is missing");
+}
+if (!email) {
+    console.log("Email is missing");
+}
+if (!contact) {
+    console.log("Contact is missing");
+}
+if (!address) {
+    console.log("Address is missing");
+}
+if (!image) {
+    console.log("Image is missing");
+}
+        if(!name || !username || !description || !email || !contact || !address || !image){
             return NextResponse.json({error: "missing store information"}, {status: 400})
         }
         //check if the user already has a store
@@ -64,7 +87,7 @@ export async function POST(request){
             description,
             username: username.toLowerCase(),
             email,
-            contract,
+            contact,
             address,
             logo: optimizedImage
         }
