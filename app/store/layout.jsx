@@ -1,8 +1,8 @@
 import StoreLayout from "@/components/store/StoreLayout";
 
 export const metadata = {
-    title: "Perfect-Lens. - Store Dashboard",
-    description: "Perfect-Lens. - Store Dashboard",
+    title: "Bop-store. - Store Dashboard",
+    description: "Bop-store. - Store Dashboard",
 };
 
 export default function RootAdminLayout({ children }) {
