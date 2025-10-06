@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["*"], // Crucial for resolving '@/lib/prisma' to './lib/prisma.js'
+      "@middlewares/*": ["middlewares/*"] // Crucial for resolving '@middlewares/authAdmin'
     }
   }
 }
