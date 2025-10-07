@@ -5,8 +5,8 @@ import {SignedIn , SignedOut ,SignIn} from "@clerk/nextjs";
 export const runtime = "edge"; 
 
 export const metadata = {
-    title: "GoCart. - Admin",
-    description: "GoCart. - Admin",
+    title: "Bopstore. - Admin",
+    description: "Bopstore. - Admin",
 };
 
 export default function RootAdminLayout({ children }) {
