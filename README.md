@@ -1,6 +1,6 @@
 <div align="center">
-  <h1><link rel="manifest" href="/site.webmanifest">
-   bopstore</h1>
+  <img src="https://drive.google.com/file/d/1NXLbXPSElrrJStqe8vc4wuxPpM7VcaJn/view?usp=sharing" alt="bopstore by gambino ">
+   BOPSTORE</h1>
   <p>
     An open-source multi-vendor e-commerce platform built with Next.js and Tailwind CSS.
   </p>
