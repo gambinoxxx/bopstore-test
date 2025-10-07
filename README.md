@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://drive.google.com/uc?export=view&id=1NXLbXPSElrrJStqe8vc4wuxPpM7VcaJn" alt="bopstore by gambino">
-   BOPSTORE</h1>
+   </h1>
   <p>
     An open-source multi-vendor e-commerce platform built with Next.js and Tailwind CSS.
   </p>
