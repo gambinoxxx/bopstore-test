@@ -10,7 +10,7 @@ export async function POST(request){
         const isAdmin = await authAdmin(userId)
 
         if(!isAdmin){
-            return NextResponse.json({error: "not authorized"}, {status: 4001})
+            return NextResponse.json({error: "not authorized"}, {status: 401})
         }
 
         const {coupon} = await request.json()
@@ -31,7 +31,7 @@ export async function POST(request){
 export async function DELETE(request){
     try {
 
-        const {userId} = getAuth()
+        const {userId} = getAuth(request)
         const isAdmin = await authAdmin(userId)
 
         if(!isAdmin){
@@ -52,7 +52,7 @@ export async function DELETE(request){
 //get all coupons /api/coupon
 export async function GET(request){
 try {
-    const {userId} = getAuth()
+    const {userId} = getAuth(request)
         const isAdmin = await authAdmin(userId)
 
         if(!isAdmin){
