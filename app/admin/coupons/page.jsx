@@ -25,7 +25,7 @@ export default function AdminCoupons() {
         try {
             const token = await getToken()
             // 💡 CHANGED API PATH: from '/api/admin/coupons' to '/api/coupon'
-            const { data } = await axios.get('/api/coupon', {
+            const { data } = await axios.get('/api/admin/coupon', {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
@@ -52,7 +52,7 @@ export default function AdminCoupons() {
             };
 
             // 💡 CHANGED API PATH: from '/api/admin/coupon' to '/api/coupon'
-            const { data } = await axios.post('/api/coupon', { coupon: couponData }, { 
+            const { data } = await axios.post('/api/admin/coupon', { coupon: couponData }, { 
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
@@ -88,7 +88,7 @@ export default function AdminCoupons() {
             const token = await getToken()
             
             // 💡 Send DELETE request with the coupon code as a query parameter
-            const { data } = await axios.delete(`/api/coupon?code=${code}`, {
+            const { data } = await axios.delete(`/api/admin/coupon?code=${code}`, {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
