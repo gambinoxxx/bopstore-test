@@ -3,13 +3,11 @@ import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import toast from "react-hot-toast"
 import { DeleteIcon } from "lucide-react"
-import { couponDummyData } from "@/assets/assets"
 import { useAuth } from "@clerk/nextjs"
-
+import axios from "axios" // 👈 ADDED: axios import
 
 export default function AdminCoupons() {
-
-    const {getToken} = useAuth()
+    const { getToken } = useAuth()
 
     const [coupons, setCoupons] = useState([])
 
@@ -26,54 +24,90 @@ export default function AdminCoupons() {
     const fetchCoupons = async () => {
         try {
             const token = await getToken()
-            const {data} = await axios.get('/api/admin/coupons',{
+            // 💡 CHANGED API PATH: from '/api/admin/coupons' to '/api/coupon'
+            const { data } = await axios.get('/api/coupon', {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
             })
             setCoupons(data.coupons)
         } catch (error) {
-            toast.error(error?.response?.data?.error || error.meassge)
+            // Fix typo: error.meassge -> error.message
+            toast.error(error?.response?.data?.error || error.message) 
         }
     }
 
     const handleAddCoupon = async (e) => {
         e.preventDefault()
-try {
-const token = await getToken()
+        try {
+            const token = await getToken()
 
-newCoupon.discount = Number(newCoupon.discount)  
-newCoupon.expiresAt = new Date(newCoupon.expiresAt)  
+            // 💡 Data transformation (good practice)
+            const couponData = {
+                ...newCoupon,
+                discount: Number(newCoupon.discount),
+                // Ensure date is sent as a proper ISO string if needed, 
+                // but new Date(newCoupon.expiresAt) is okay for Prisma if the input value is a date string.
+                expiresAt: new Date(newCoupon.expiresAt) 
+            };
 
-const {data} = await axios.post('/api/admin/coupon',{coupon:newCoupon},{headers:{
-    Authorization:`Bearer ${token}`
-}})
-toast.success(data.message)
-await fetchCoupons()
+            // 💡 CHANGED API PATH: from '/api/admin/coupon' to '/api/coupon'
+            const { data } = await axios.post('/api/coupon', { coupon: couponData }, { 
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            })
+            toast.success(data.message)
+            
+            // Clear the form after successful add
+            setNewCoupon({
+                 code: '',
+                 description: '',
+                 discount: '',
+                 forNewUser: false,
+                 forMember: false,
+                 isPublic: false,
+                 expiresAt: new Date()
+            });
 
-} catch (error) {
-    
-}
-
+            await fetchCoupons()
+        } catch (error) {
+             toast.error(error?.response?.data?.error || error.message)
+        }
     }
 
     const handleChange = (e) => {
-        setNewCoupon({ ...newCoupon, [e.target.name]: e.target.value })
+        // Handle checkbox toggles for boolean fields (forNewUser, forMember)
+        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        setNewCoupon({ ...newCoupon, [e.target.name]: value })
     }
 
+    // ✅ IMPLEMENTED FUNCTION
     const deleteCoupon = async (code) => {
-        // Logic to delete a coupon
+        try {
+            const token = await getToken()
+            
+            // 💡 Send DELETE request with the coupon code as a query parameter
+            const { data } = await axios.delete(`/api/coupon?code=${code}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            })
 
-
+            toast.success(data.message)
+            await fetchCoupons() // Reload the list
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
     }
 
+    // The rest of your component remains the same for the return statement...
     useEffect(() => {
         fetchCoupons();
     }, [])
 
     return (
         <div className="text-slate-500 mb-40">
-
             {/* Add Coupon */}
             <form onSubmit={(e) => toast.promise(handleAddCoupon(e), { loading: "Adding coupon..." })} className="max-w-sm text-sm">
                 <h2 className="text-2xl">Add <span className="text-slate-800 font-medium">Coupons</span></h2>
@@ -97,11 +131,12 @@ await fetchCoupons()
                 </label>
 
                 <div className="mt-5">
+                    {/* Simplified handleChange for checkboxes (though your original worked too) */}
                     <div className="flex gap-2 mt-3">
                         <label className="relative inline-flex items-center cursor-pointer text-gray-900 gap-3">
                             <input type="checkbox" className="sr-only peer"
                                 name="forNewUser" checked={newCoupon.forNewUser}
-                                onChange={(e) => setNewCoupon({ ...newCoupon, forNewUser: e.target.checked })}
+                                onChange={handleChange} 
                             />
                             <div className="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:bg-green-600 transition-colors duration-200"></div>
                             <span className="dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-5"></span>
@@ -112,7 +147,7 @@ await fetchCoupons()
                         <label className="relative inline-flex items-center cursor-pointer text-gray-900 gap-3">
                             <input type="checkbox" className="sr-only peer"
                                 name="forMember" checked={newCoupon.forMember}
-                                onChange={(e) => setNewCoupon({ ...newCoupon, forMember: e.target.checked })}
+                                onChange={handleChange} 
                             />
                             <div className="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:bg-green-600 transition-colors duration-200"></div>
                             <span className="dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-5"></span>
@@ -145,7 +180,8 @@ await fetchCoupons()
                                     <td className="py-3 px-4 font-medium text-slate-800">{coupon.code}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.description}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.discount}%</td>
-                                    <td className="py-3 px-4 text-slate-800">{format(coupon.expiresAt, 'yyyy-MM-dd')}</td>
+                                    {/* Ensure coupon.expiresAt is a valid Date object or ISO string */}
+                                    <td className="py-3 px-4 text-slate-800">{format(new Date(coupon.expiresAt), 'yyyy-MM-dd')}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.forNewUser ? 'Yes' : 'No'}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.forMember ? 'Yes' : 'No'}</td>
                                     <td className="py-3 px-4 text-slate-800">
