@@ -6,7 +6,7 @@ import authAdmin from "@middlewares/authAdmin";
 //add new coupon 
 export async function POST(request){
     try{
-        const {userId} = getAuth()
+        const {userId} = getAuth(request)
         const isAdmin = await authAdmin(userId)
 
         if(!isAdmin){
