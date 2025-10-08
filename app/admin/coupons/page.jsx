@@ -18,7 +18,7 @@ export default function AdminCoupons() {
         forNewUser: false,
         forMember: false,
         isPublic: false,
-        expiresAt: new Date()
+        expiresAt: format(new Date(), 'yyyy-MM-dd') 
     })
 
     const fetchCoupons = async () => {
