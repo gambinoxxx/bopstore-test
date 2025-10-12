@@ -5,42 +5,38 @@ import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 import SellerNavbar from "./StoreNavbar"
 import SellerSidebar from "./StoreSidebar"
+import { useAuth } from "@clerk/nextjs"
+import{axios} from 'axios'
+
 // No longer need dummy data, as it will come from the API
 // import { dummyStoreData } from "@/assets/assets" 
 
 const StoreLayout = ({ children }) => {
+    const {getToken} = useAuth()
+
     const [isSeller, setIsSeller] = useState(false)
     const [loading, setLoading] = useState(true)
     const [storeInfo, setStoreInfo] = useState(null)
 
+    const fetchIsSeller = async () => {
+        try {
+            const token = await getToken()
+            const {data} = await axios.get('/api/store/is-seller', {headers: {
+                Authorization: `Bearer ${token}`}})
+            setIsSeller(data.isSeller)
+            setStoreInfo(data.storeInfo)
+
+        } catch (error) {
+            console.log(error)
+        }
+        finally {
+            setLoading(false)
+        }
+    }
+
     useEffect(() => {
-        const checkSellerStatus = async () => {
-            try {
-                // Call your new API endpoint
-                const response = await fetch('/api/store/is-seller');
-
-                // If the response is not OK (e.g., 401 Unauthorized), the user is not a seller
-                if (!response.ok) {
-                    setIsSeller(false);
-                    return; 
-                }
-
-                // If successful, parse the JSON and update the state
-                const data = await response.json();
-                setIsSeller(data.isSeller);
-                setStoreInfo(data.storeInfo);
-
-            } catch (error) {
-                console.error("Failed to verify seller status:", error);
-                setIsSeller(false); // Assume not a seller on error
-            } finally {
-                // Ensure loading is set to false after the check is complete
-                setLoading(false);
-            }
-        };
-
-        checkSellerStatus();
-    }, []); // The empty dependency array [] means this runs once when the component mounts
+        fetchIsSeller()
+    }, [])
 
     return loading ? (
         <Loading />
@@ -65,4 +61,4 @@ const StoreLayout = ({ children }) => {
     );
 }
 
-export default StoreLayout;
+ export default StoreLayout;

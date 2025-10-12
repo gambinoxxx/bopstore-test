@@ -8,6 +8,7 @@ import { useEffect, useState } from "react"
 
 export default function Dashboard() {
 
+    const {getToken} = useAuth()
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
 
     const router = useRouter()
@@ -28,8 +29,17 @@ export default function Dashboard() {
     ]
 
     const fetchDashboardData = async () => {
-        setDashboardData(dummyStoreDashboardData)
-        setLoading(false)
+       try {
+        const token = await getToken()
+        
+        const {data} = await axios.get('/api/store/dashboard', {headers: {
+            Authorization: `Bearer ${token}`}})
+        setDashboardData(data.dashboardData)
+
+       } catch (error) {
+        toast.error(error?.response?.data?.error || error.message)
+       }
+       setLoading(false)
     }
 
     useEffect(() => {
