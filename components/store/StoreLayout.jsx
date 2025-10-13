@@ -1,62 +1,50 @@
 'use client'
 import { useEffect, useState } from "react"
-import { useAuth } from "@clerk/nextjs"
-import axios from 'axios'
 import Loading from "../Loading"
 import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 import SellerNavbar from "./StoreNavbar"
 import SellerSidebar from "./StoreSidebar"
+// No longer need dummy data, as it will come from the API
+// import { dummyStoreData } from "@/assets/assets" 
 
 const StoreLayout = ({ children }) => {
-    // Destructure isLoaded and isSignedIn from useAuth
-    const { getToken, isLoaded, isSignedIn } = useAuth();
-
-    const [isSeller, setIsSeller] = useState(false);
-    const [apiLoading, setApiLoading] = useState(true); // Renamed to avoid confusion
-    const [storeInfo, setStoreInfo] = useState(null);
+    const [isSeller, setIsSeller] = useState(false)
+    const [loading, setLoading] = useState(true)
+    const [storeInfo, setStoreInfo] = useState(null)
 
     useEffect(() => {
-        // Guard clause: Do nothing until Clerk has loaded.
-        if (!isLoaded) {
-            return;
-        }
-
-        // If Clerk is loaded but the user is not signed in, we can stop.
-        if (!isSignedIn) {
-            setApiLoading(false);
-            setIsSeller(false);
-            return;
-        }
-
-        // Now we know Clerk is loaded and the user is signed in.
-        const fetchIsSeller = async () => {
+        const checkSellerStatus = async () => {
             try {
-                const token = await getToken();
-                const { data } = await axios.get('/api/store/is-seller', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                // Call your new API endpoint
+                const response = await fetch('/api/store/is-seller');
+
+                // If the response is not OK (e.g., 401 Unauthorized), the user is not a seller
+                if (!response.ok) {
+                    setIsSeller(false);
+                    return; 
+                }
+
+                // If successful, parse the JSON and update the state
+                const data = await response.json();
                 setIsSeller(data.isSeller);
                 setStoreInfo(data.storeInfo);
+
             } catch (error) {
-                console.error("API Error: Failed to verify seller status.", error.response?.data || error.message);
-                setIsSeller(false); // Default to not a seller on error
+                console.error("Failed to verify seller status:", error);
+                setIsSeller(false); // Assume not a seller on error
             } finally {
-                setApiLoading(false);
+                // Ensure loading is set to false after the check is complete
+                setLoading(false);
             }
         };
 
-        fetchIsSeller();
+        checkSellerStatus();
+    }, []); // The empty dependency array [] means this runs once when the component mounts
 
-    }, [isLoaded, isSignedIn, getToken]); // Rerun effect when Clerk's state changes
-
-    // The primary loading screen: waits for BOTH Clerk and your API call.
-    if (!isLoaded || apiLoading) {
-        return <Loading />;
-    }
-
-    // Now render based on the final state
-    return isSeller ? (
+    return loading ? (
+        <Loading />
+    ) : isSeller ? (
         <div className="flex flex-col h-screen">
             <SellerNavbar />
             <div className="flex flex-1 items-start h-full overflow-y-scroll no-scrollbar">
