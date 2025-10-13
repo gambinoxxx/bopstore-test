@@ -1,56 +1,61 @@
 'use client'
 import { useEffect, useState } from "react"
+import { useAuth } from "@clerk/nextjs"
+import axios from 'axios'
 import Loading from "../Loading"
 import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 import SellerNavbar from "./StoreNavbar"
 import SellerSidebar from "./StoreSidebar"
-import { useAuth } from "@clerk/nextjs"
-import axios from 'axios'
 
 const StoreLayout = ({ children }) => {
     // Destructure isLoaded and isSignedIn from useAuth
     const { getToken, isLoaded, isSignedIn } = useAuth();
 
     const [isSeller, setIsSeller] = useState(false);
-    // Start with loading true, but the primary loading guard will be Clerk's `isLoaded`
-    const [loading, setLoading] = useState(true);
+    const [apiLoading, setApiLoading] = useState(true); // Renamed to avoid confusion
     const [storeInfo, setStoreInfo] = useState(null);
 
     useEffect(() => {
-        // Only run this effect if Clerk has loaded and there's a signed-in user
-        if (isLoaded && isSignedIn) {
-            const fetchIsSeller = async () => {
-                try {
-                    const token = await getToken();
-                    const { data } = await axios.get('/api/store/is-seller', {
-                        headers: {
-                            Authorization: `Bearer ${token}`
-                        }
-                    });
-                    setIsSeller(data.isSeller);
-                    setStoreInfo(data.storeInfo);
-                } catch (error) {
-                    console.error("Failed to verify seller status:", error);
-                    setIsSeller(false); // Default to not a seller on error
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchIsSeller();
-        } else if (isLoaded && !isSignedIn) {
-            // If Clerk is loaded but no user is signed in, stop loading and show unauthorized
-            setLoading(false);
-            setIsSeller(false);
+        // Guard clause: Do nothing until Clerk has loaded.
+        if (!isLoaded) {
+            return;
         }
+
+        // If Clerk is loaded but the user is not signed in, we can stop.
+        if (!isSignedIn) {
+            setApiLoading(false);
+            setIsSeller(false);
+            return;
+        }
+
+        // Now we know Clerk is loaded and the user is signed in.
+        const fetchIsSeller = async () => {
+            try {
+                const token = await getToken();
+                const { data } = await axios.get('/api/store/is-seller', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setIsSeller(data.isSeller);
+                setStoreInfo(data.storeInfo);
+            } catch (error) {
+                console.error("API Error: Failed to verify seller status.", error.response?.data || error.message);
+                setIsSeller(false); // Default to not a seller on error
+            } finally {
+                setApiLoading(false);
+            }
+        };
+
+        fetchIsSeller();
+
     }, [isLoaded, isSignedIn, getToken]); // Rerun effect when Clerk's state changes
 
-    // 💡 This is the crucial part: Show a loading screen while Clerk is initializing.
-    if (!isLoaded || loading) {
+    // The primary loading screen: waits for BOTH Clerk and your API call.
+    if (!isLoaded || apiLoading) {
         return <Loading />;
     }
 
-    // After loading, the rest of the logic proceeds as before
+    // Now render based on the final state
     return isSeller ? (
         <div className="flex flex-col h-screen">
             <SellerNavbar />
