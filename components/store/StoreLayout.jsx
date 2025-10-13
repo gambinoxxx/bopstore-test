@@ -6,7 +6,7 @@ import { ArrowRightIcon } from "lucide-react"
 import SellerNavbar from "./StoreNavbar"
 import SellerSidebar from "./StoreSidebar"
 import { useAuth } from "@clerk/nextjs"
-import{axios} from 'axios'
+import axios from 'axios'
 
 // No longer need dummy data, as it will come from the API
 // import { dummyStoreData } from "@/assets/assets" 
