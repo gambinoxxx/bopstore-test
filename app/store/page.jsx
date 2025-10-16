@@ -1,7 +1,6 @@
 'use client'
 import axios from "axios"
 import toast from "react-hot-toast"
-import { dummyStoreDashboardData } from "@/assets/assets"
 import Loading from "@/components/Loading"
 import { CircleDollarSignIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lucide-react"
 import Image from "next/image"

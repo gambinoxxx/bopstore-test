@@ -21,7 +21,7 @@ export async function POST(request) {
         const mrp = Number(formData.get("mrp"))
         const price = Number(formData.get("price"))
         const category = formData.get("category")
-        const images = formData.getAII("images")
+        const images = formData.getAll("images")
 
         if (!name || !description || !mrp || !price || !category || !images){
             return NextResponse.json({error: "missing product details"}, {status: 400})
@@ -61,7 +61,7 @@ export async function POST(request) {
     catch (error) {
 
         console.error(error);
-        return NextResponse.json({error: error.ocde || error.message}, {status: 400})
+        return NextResponse.json({error: error.code || error.message}, {status: 400})
     }
 }
 
@@ -82,7 +82,7 @@ export async function GET(request){
         return NextResponse.json({products})
     }catch (error){
         console.error(error);
-        return NextResponse.json({error: error.ocde || error.message}, 
+        return NextResponse.json({error: error.code || error.message}, 
             {status: 400})
 
     }   
