@@ -21,7 +21,7 @@ export async function POST(request) {
         return NextResponse.json({ error: error.message}, {status: 400 })
     }
 }
-
+//get user cart
 export async function GET(request) {
     try {
         const {userId} = getAuth(request)

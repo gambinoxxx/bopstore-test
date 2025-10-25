@@ -29,7 +29,7 @@ export default function StoreOrders() {
 
     const updateOrderStatus = async (orderId, status) => {
     try {
-        const token = await getToken()
+        const token = await getToken()                                                                                                                                                                                                                                                                                                
         await axios.post('/api/store/orders',{orderId, status},{headers:{
             Authorization: `Bearer ${token}`
         }})
