@@ -7,6 +7,9 @@ import { NextResponse } from "next/server";
 export async function POST(request) {
     try {
         const {userId} = getAuth(request)
+        if (!userId) {
+            return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+        }
         const {cart} = await request.json()
 
         //save the cart to the user object 
@@ -25,6 +28,9 @@ export async function POST(request) {
 export async function GET(request) {
     try {
         const {userId} = getAuth(request)
+        if (!userId) {
+            return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+        }
        
         const user = await prisma.user.findUnique({
             where: {id: userId}
