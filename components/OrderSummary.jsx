@@ -1,16 +1,18 @@
-import { PlusIcon, SquarePenIcon, XIcon } from 'lucide-react';
+import { PlusIcon, SquarePenIcon, XIcon } from 'lucide-react'
 import React, { useState } from 'react'
 import AddressModal from './AddressModal';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { clearCart } from '@/lib/features/cart/cartSlice';
 import { Protect, useAuth, useUser } from '@clerk/nextjs';
 import axios from 'axios';
 
 const OrderSummary = ({ totalPrice, items }) => {
-  
+
     const {user} = useUser();
     const {getToken} = useAuth();
+    const dispatch = useDispatch();
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
 
@@ -43,8 +45,36 @@ const OrderSummary = ({ totalPrice, items }) => {
 
     const handlePlaceOrder = async (e) => {
         e.preventDefault();
+    try {
+        if (!user) {
+            return toast('please login to place an order');
+        }
+         if (!selectedAddress) {
+            return toast('please lselect an address to place an order');
+        }
+        const token = await getToken();
 
-        router.push('/orders')
+        const orderData = {
+            addressId: selectedAddress.id,
+            items,
+            paymentMethod
+        }
+        if (coupon){
+            orderData.couponCode = coupon.code;
+        }
+        const {data} = await axios.post('/api/orders', orderData,{
+            headers:{Authorization: `Bearer ${token}`}
+        })
+        if (paymentMethod === 'STRIPE'){
+            window.location.href = data.session.url;
+        }else{
+            toast.success(data.message);
+            router.push('/orders');
+            dispatch(clearCart());
+        }
+    } catch (error) {
+        toast.error(error?.response?.data?.error || error.message);
+    }
     }
 
     return (
@@ -116,7 +146,7 @@ const OrderSummary = ({ totalPrice, items }) => {
             </div>
             <div className='flex justify-between py-4'>
                 <p>Total:</p>
-                
+
                 <p className='font-medium text-right'>
                     <Protect plan ={'bop_plus'} fallback={`${currency}${coupon ? (totalPrice + 3500 - (coupon.discount / 100 * totalPrice)).toFixed(2) : (totalPrice + 3500).toLocaleString()}
                     `}>                

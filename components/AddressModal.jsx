@@ -1,6 +1,7 @@
 'use client'
 import { addAddress } from "@/lib/features/address/addressSlice"
 import { useAuth } from "@clerk/nextjs"
+import axios from "axios"
 import { XIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "react-hot-toast"

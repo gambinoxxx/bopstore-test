@@ -2,15 +2,37 @@
 import PageTitle from "@/components/PageTitle"
 import { useEffect, useState } from "react";
 import OrderItem from "@/components/OrderItem";
-//import { orderDummyData } from "@/assets/assets";
+import { useAuth } from "@clerk/nextjs";
+import axios from "axios";
+import toast from "react-hot-toast";
+import Loading from "@/components/Loading";
 
 export default function Orders() {
 
     const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const { getToken } = useAuth();
 
     useEffect(() => {
-        setOrders(orderDummyData)
+        const fetchOrders = async () => {
+            try {
+                const token = await getToken();
+                const { data } = await axios.get('/api/orders', {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+                setOrders(data.orders);
+            } catch (error) {
+                toast.error(error?.response?.data?.error || 'Failed to fetch orders');
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchOrders();
     }, []);
+
+    if (loading) return <Loading />
 
     return (
         <div className="min-h-[70vh] mx-6">
