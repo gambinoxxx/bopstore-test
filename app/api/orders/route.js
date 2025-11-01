@@ -113,6 +113,9 @@ export async function POST(request) {
 export async function GET(request) {
     try {
         const {userId} = getAuth(request);
+        if (!userId) {
+            return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
+        }
         const orders = await prisma.order.findMany({
             where: {userId, OR:[
                 {paymentMethod: 'COD'},

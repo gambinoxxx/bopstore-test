@@ -5,7 +5,8 @@ import { useEffect, useState } from "react"
 import { MailIcon, MapPinIcon } from "lucide-react"
 import Loading from "@/components/Loading"
 import Image from "next/image"
-//import { dummyStoreData, productDummyData } from "@/assets/assets"
+import toast from "react-hot-toast"
+import axios from "axios"
 
 export default function StoreShop() {
 
@@ -15,16 +16,30 @@ export default function StoreShop() {
     const [loading, setLoading] = useState(true)
 
     const fetchStoreData = async () => {
-        setStoreInfo(dummyStoreData)
-        setProducts(productDummyData)
-        setLoading(false)
+       try {
+        if (!username) return;
+        const {data} = await axios.get(`/api/store/data?username=${username}`)
+        if (data.store) {
+            setStoreInfo(data.store)
+            setProducts(data.store.products || [])
+        } else {
+            setStoreInfo(null) // Explicitly set to null if not found
+        }
+       } catch (error) {
+        toast.error(error?.response?.data?.error || error.message)
+       }
+       setLoading(false)
     }
 
-    useEffect(() => {
-        fetchStoreData()
-    }, [])
+    useEffect(() => { 
+        if (username) {
+            fetchStoreData()
+        }
+    }, [username])
 
-    return !loading ? (
+    if (loading) return <Loading />
+
+    return (
         <div className="min-h-[70vh] mx-6">
 
             {/* Store Info Banner */}
@@ -40,7 +55,6 @@ export default function StoreShop() {
                     <div className="text-center md:text-left">
                         <h1 className="text-3xl font-semibold text-slate-800">{storeInfo.name}</h1>
                         <p className="text-sm text-slate-600 mt-2 max-w-lg">{storeInfo.description}</p>
-                        <div className="text-xs text-slate-500 mt-4 space-y-1"></div>
                         <div className="space-y-2 text-sm text-slate-500">
                             <div className="flex items-center">
                                 <MapPinIcon className="w-4 h-4 text-gray-500 mr-2" />
@@ -58,11 +72,19 @@ export default function StoreShop() {
 
             {/* Products */}
             <div className=" max-w-7xl mx-auto mb-40">
-                <h1 className="text-2xl mt-12">Shop <span className="text-slate-800 font-medium">Products</span></h1>
-                <div className="mt-5 grid grid-cols-2 sm:flex flex-wrap gap-6 xl:gap-12 mx-auto">
-                    {products.map((product) => <ProductCard key={product.id} product={product} />)}
-                </div>
+                {storeInfo ? (
+                    <>
+                        <h1 className="text-2xl mt-12">Shop <span className="text-slate-800 font-medium">Products</span></h1>
+                        <div className="mt-5 grid grid-cols-2 sm:flex flex-wrap gap-6 xl:gap-12 mx-auto">
+                            {products.map((product) => <ProductCard key={product.id} product={product} />)}
+                        </div>
+                    </>
+                ) : (
+                    <div className="min-h-[50vh] flex items-center justify-center text-slate-400">
+                        <h1 className="text-2xl sm:text-4xl font-semibold">Store not found</h1>
+                    </div>
+                )}
             </div>
         </div>
-    ) : <Loading />
+    )
 }
