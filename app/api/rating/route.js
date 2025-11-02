@@ -37,6 +37,7 @@ export async function GET(request) {
         const ratings = await prisma.rating.findMany({
             where: {userId},
         })
+        return NextResponse.json({ratings});
         
     } catch (error) {
         console.error(error);

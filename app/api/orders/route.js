@@ -122,6 +122,7 @@ export async function GET(request) {
                 {AND: [{paymentMethod: 'STRIPE'}, {isPaid: true}]}
             ]},
 
+            where: { userId },
             include:{
                 orderItems: {include: {product: true}},
                 address: true,
