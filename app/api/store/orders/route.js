@@ -16,7 +16,7 @@ try {
    const{orderId, status} = await request.json()
 
    await prisma.order.update({
-    where: {id: orderId, StoreId},
+    where: {id: orderId, storeId: StoreId},
     data: {status}
    })
 
@@ -36,7 +36,7 @@ export async function GET(request) {
         return NextResponse.json({error: 'not authorized'}, {status: 401})
     }
     const orders =  await prisma.order.findMany({
-        where: {StoreId},
+        where: {storeId: StoreId},
         include: {user:true, address:true, orderItems: {include:{product:true}}},
         orderBy: {createdAt: 'desc'}
     })
