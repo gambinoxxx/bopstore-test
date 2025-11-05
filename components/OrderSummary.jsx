@@ -65,9 +65,9 @@ const OrderSummary = ({ totalPrice, items }) => {
         const {data} = await axios.post('/api/orders', orderData,{
             headers:{Authorization: `Bearer ${token}`}
         })
-        if (paymentMethod === 'STRIPE'){
-            window.location.href = data.session.url;
-        }else{
+        if (paymentMethod === 'PAYSTACK'){
+            window.location.href = data.session.authorization_url;
+        } else {
             toast.success(data.message);
             router.push('/orders');
             dispatch(clearCart());
@@ -86,8 +86,8 @@ const OrderSummary = ({ totalPrice, items }) => {
                 <label htmlFor="COD" className='cursor-pointer'>COD</label>
             </div>
             <div className='flex gap-2 items-center mt-1'>
-                <input type="radio" id="STRIPE" name='payment' onChange={() => setPaymentMethod('STRIPE')} checked={paymentMethod === 'STRIPE'} className='accent-gray-500' />
-                <label htmlFor="STRIPE" className='cursor-pointer'>Stripe Payment</label>
+                <input type="radio" id="PAYSTACK" name='payment' onChange={() => setPaymentMethod('PAYSTACK')} checked={paymentMethod === 'PAYSTACK'} className='accent-gray-500' />
+                <label htmlFor="PAYSTACK" className='cursor-pointer'>Paystack</label>
             </div>
             <div className='my-4 py-4 border-y border-slate-200 text-slate-400'>
                 <p>Address</p>

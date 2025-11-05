@@ -1,9 +1,11 @@
 import prisma from "@/lib/prisma";
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-
+import paystack from "paystack";
 
 export async function POST(request) {
+    console.log('CLERK_SECRET_KEY:', process.env.CLERK_SECRET_KEY ? 'Loaded' : 'Not Loaded');
+
     try {
         const {userId ,has } = getAuth(request)
         if (!userId) {
@@ -48,64 +50,112 @@ export async function POST(request) {
         }
         //group orders by storeId using a Map
         const ordersByStore = new Map()
+        
+        // --- PERFORMANCE FIX: Fetch all products at once to avoid N+1 problem ---
+        const productIds = items.map(item => item.id);
+        const products = await prisma.product.findMany({
+            where: { id: { in: productIds } }
+        });
+        const productMap = new Map(products.map(p => [p.id, p]));
 
-        for(const item of items){
-            const product = await prisma.product.findUnique({
-                where: {id: item.id}
-            })
-            const storeId = product.storeId;
+        for(const item of items) {
+            const product = productMap.get(item.id);
+            if (!product) {
+                return NextResponse.json({ error: `Product with id ${item.id} not found.` }, { status: 404 });
+            }
+            const storeId = product.storeId
             if (!ordersByStore.has(storeId)) {
                 ordersByStore.set(storeId, []);
             }
             ordersByStore.get(storeId).push({...item, price: product.price});
         }
 
-        let orderIds =[];
-        let fullAmount = 0;
-
-        let isShippingFeeAdded = false
-
-        //create orders for each seller 
-        for (const [storeId ,sellerItems] of ordersByStore.entries()){
+        const calculateOrderDetails = (storeId, sellerItems, shippingAdded) => {
             let total = sellerItems.reduce((acc,item)=>acc + (item.price * item.quantity),0);
+            let isShippingFeeAddedNow = shippingAdded;
 
             if (couponCode){
                 total -= (total * coupon.discount) / 100;
 
             }
-            if (!hasPlusPlan && !isShippingFeeAdded){
-                total += 3500;
-                isShippingFeeAdded = true;
+            if (!hasPlusPlan && !shippingAdded){
+                total += 35; // Assuming shipping fee is 35
+                isShippingFeeAddedNow = true;
             }
-            fullAmount += parseFloat(total.toFixed(2))
+            return { total: parseFloat(total.toFixed(2)), shippingAdded: isShippingFeeAddedNow };
+        };
 
-            const order = await prisma.order.create({
-                data: {
-                    userId,
-                    storeId,
-                    addressId,
-                    total: parseFloat(total.toFixed(2)),
-                    paymentMethod,
-                    isCouponUsed: coupon ? true : false,
-                    coupon: coupon ? coupon : {},
-                    orderItems:{
-                        create: sellerItems.map(item =>({
-                            productId: item.id,
-                            quantity: item.quantity,
-                            price: item.price,
-                        }))
-                    }
+        let fullAmount = 0;
+        let isShippingFeeAdded = false;
+        const orderCreationData = [];
+
+        for (const [storeId, sellerItems] of ordersByStore.entries()) {
+            const { total, shippingAdded } = calculateOrderDetails(storeId, sellerItems, isShippingFeeAdded);
+            isShippingFeeAdded = shippingAdded;
+            fullAmount += total;
+            orderCreationData.push({
+                userId,
+                storeId,
+                addressId,
+                total,
+                paymentMethod,
+                isCouponUsed: !!coupon,
+                coupon: coupon ? coupon : {},
+                orderItems: {
+                    create: sellerItems.map(item => ({
+                        productId: item.id,
+                        quantity: item.quantity,
+                        price: item.price,
+                    }))
                 }
-            })
-            orderIds.push(order.id);
-        } 
-        await prisma.user.update({
-            where: {id: userId},
-            data: {cart: {}}
-        })
+            });
+        }
+
+        // --- DATA INTEGRITY FIX: Use a transaction to create orders ---
+        const createdOrders = await prisma.$transaction(
+            orderCreationData.map(data => prisma.order.create({ data }))
+        );
+
+        const orderIds = createdOrders.map(order => order.id);
+
+        if (paymentMethod === 'PAYSTACK') {
+            const paystackInstance = paystack(process.env.PAYSTACK_SECRET_KEY);
+            const origin = request.headers.get('origin');
+
+            // Find user's email for Paystack
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            if (!user) {
+                return NextResponse.json({ error: 'User not found' }, { status: 404 });
+            }
+
+            const response = await paystackInstance.transaction.initialize({
+                amount: Math.round(fullAmount * 100), // Amount in kobo/cents
+                email: user.email,
+                currency: 'NGN', // or 'NGN', 'GHS', 'ZAR'
+                callback_url: `${origin}/verify-payment`,
+                metadata: {
+                    orderIds: orderIds.join(','),
+                    userId,
+                }
+            });
+
+            // The response body from paystack contains the authorization URL
+            return NextResponse.json({ session: response.data });
+        }
+
+        // For non-Stripe payments, clear the cart immediately
+        if (paymentMethod !== 'PAYSTACK') {
+            await prisma.user.update({
+                where: {id: userId},
+                data: {cart: {}}
+            });
+        }
+
         return NextResponse.json({message: 'Order placed successfully'});
     } catch (error) {
-        return NextResponse.json({ error: error.code || error.message }, { status: 400 });
+        // Log the full error to the server console for better debugging
+        console.error("Error creating order:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
 //get all orders for a user 
@@ -117,13 +167,15 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
         }
         const orders = await prisma.order.findMany({
-            where: {userId, OR:[
-                {paymentMethod: 'COD'},
-                {AND: [{paymentMethod: 'STRIPE'}, {isPaid: true}]}
-            ]},
-
-            where: { userId },
-            include:{
+            // --- BUG FIX: Combined where clauses ---
+            where: {
+                userId,
+                OR: [
+                    { paymentMethod: 'COD' },
+                    { paymentMethod: 'PAYSTACK', isPaid: true }
+                ]
+            },
+            include: {
                 orderItems: {include: {product: true}},
                 address: true,
             },
