@@ -8,6 +8,8 @@ import { clearCart } from '@/lib/features/cart/cartSlice';
 import { Protect, useAuth, useUser } from '@clerk/nextjs';
 import axios from 'axios';
 
+const DELIVERY_FEE = 3500;
+
 const OrderSummary = ({ totalPrice, items }) => {
 
     const {user} = useUser();
@@ -43,6 +45,19 @@ const OrderSummary = ({ totalPrice, items }) => {
         }
     }
 
+    // Calculate the final amount to be sent to the backend
+    const isPlusMember = user?.publicMetadata?.plan === 'bop_plus';
+    const shippingCost = isPlusMember ? 0 : DELIVERY_FEE;
+    const couponDiscount = coupon ? (coupon.discount / 100 * totalPrice) : 0;
+    const finalAmount = totalPrice + shippingCost - couponDiscount;
+
+    const totalForDisplay = new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(finalAmount);
+
+    const shippingForDisplay = isPlusMember ? 'Free' : `${currency}${DELIVERY_FEE.toLocaleString()}`;
+
     const handlePlaceOrder = async (e) => {
         e.preventDefault();
     try {
@@ -57,7 +72,8 @@ const OrderSummary = ({ totalPrice, items }) => {
         const orderData = {
             addressId: selectedAddress.id,
             items,
-            paymentMethod
+            paymentMethod,
+            totalAmount: finalAmount // Send the final calculated amount
         }
         if (coupon){
             orderData.couponCode = coupon.code;
@@ -125,7 +141,7 @@ const OrderSummary = ({ totalPrice, items }) => {
                     </div>
                     <div className='flex flex-col gap-1 font-medium text-right'>
                         <p>{currency}{totalPrice.toLocaleString()}</p>
-                        <p><Protect plan={'bop_plus'} fallback={`${currency}3500`}>Free</Protect></p>
+                        <p>{shippingForDisplay}</p>
                         {coupon && <p>{`-${currency}${(coupon.discount / 100 * totalPrice).toFixed(2)}`}</p>}
                     </div>
                 </div>
@@ -147,12 +163,7 @@ const OrderSummary = ({ totalPrice, items }) => {
             <div className='flex justify-between py-4'>
                 <p>Total:</p>
 
-                <p className='font-medium text-right'>
-                    <Protect plan ={'bop_plus'} fallback={`${currency}${coupon ? (totalPrice + 3500 - (coupon.discount / 100 * totalPrice)).toFixed(2) : (totalPrice + 3500).toLocaleString()}
-                    `}>                
-                     {currency}{coupon ? (totalPrice  - (coupon.discount / 100 * totalPrice)).toFixed(2) : totalPrice.toLocaleString()}
-                    </Protect>
-                    </p>
+                <p className='font-medium text-right'>{currency}{totalForDisplay}</p>
             </div>
             <button onClick={e => toast.promise(handlePlaceOrder(e), { loading: 'placing Order...' })} className='w-full bg-slate-700 text-white py-2.5 rounded hover:bg-slate-900 active:scale-95 transition-all'>Place Order</button>
 

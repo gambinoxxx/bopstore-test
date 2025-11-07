@@ -27,20 +27,24 @@ export default function StoreManageProducts() {
         setLoading(false)
     }
 
-    const toggleStock = async (productId) => {
-       try {
-         const token = await getToken()
-         const {data} = await axios.post('/api/store/stock-toggle',{productId}, {headers: 
-            {Authorization: `Bearer ${token}` }}) 
-      setProducts(prevProducts => prevProducts.map(product => 
-        product.id === productId ? {...product, inStock: !product.inStock} : product
-      ))
-      toast.success(data.message)
-       } catch (error) {
-        toast.error(error?.response?.data?.error || error.message)
+    const handleStockChange = (productId, newStock) => {
+        setProducts(prevProducts =>
+            prevProducts.map(p => (p.id === productId ? { ...p, stock: newStock } : p))
+        );
+    };
 
-       }
-    }
+    const updateStock = async (productId, stock) => {
+        try {
+            const token = await getToken();
+            const { data } = await axios.put('/api/store/product', { productId, stock: Number(stock) }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            toast.success(data.message);
+        } catch (error) {
+            toast.error(error?.response?.data?.error || 'Failed to update stock.');
+            fetchProducts(); // Re-fetch to revert optimistic update on error
+        }
+    };
 
     useEffect(() => {
           if(user){
@@ -60,7 +64,7 @@ export default function StoreManageProducts() {
                         <th className="px-4 py-3 hidden md:table-cell">Description</th>
                         <th className="px-4 py-3 hidden md:table-cell">MRP</th>
                         <th className="px-4 py-3">Price</th>
-                        <th className="px-4 py-3">Actions</th>
+                        <th className="px-4 py-3">Stock</th>
                     </tr>
                 </thead>
                 <tbody className="text-slate-700">
@@ -75,12 +79,19 @@ export default function StoreManageProducts() {
                             <td className="px-4 py-3 max-w-md text-slate-600 hidden md:table-cell truncate">{product.description}</td>
                             <td className="px-4 py-3 hidden md:table-cell">{currency} {product.mrp.toLocaleString()}</td>
                             <td className="px-4 py-3">{currency} {product.price.toLocaleString()}</td>
-                            <td className="px-4 py-3 text-center">
-                                <label className="relative inline-flex items-center cursor-pointer text-gray-900 gap-3">
-                                    <input type="checkbox" className="sr-only peer" onChange={() => toast.promise(toggleStock(product.id), { loading: "Updating data..." })} checked={product.inStock} />
-                                    <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-green-600 transition-colors duration-200"></div>
-                                    <span className="dot absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-4"></span>
-                                </label>
+                            <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={product.stock}
+                                        onChange={(e) => handleStockChange(product.id, e.target.value)}
+                                        className="w-16 p-1 border border-slate-300 rounded-md text-center"
+                                        min="0"
+                                    />
+                                    <button onClick={() => toast.promise(updateStock(product.id, product.stock), { loading: "Saving..." })} className="bg-slate-600 text-white text-xs px-3 py-1.5 rounded hover:bg-slate-700 active:scale-95 transition">
+                                        Save
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     ))}

@@ -87,3 +87,44 @@ export async function GET(request){
 
     }   
 }
+
+// update product stock
+export async function PUT(request) {
+    try {
+        const { userId } = getAuth(request);
+        const storeId = await authSeller(userId);
+
+        if (!storeId) {
+            return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+        }
+
+        const { productId, stock } = await request.json();
+
+        if (!productId || stock === undefined || stock === null || isNaN(stock)) {
+            return NextResponse.json({ error: "Missing or invalid product details" }, { status: 400 });
+        }
+
+        // Ensure the product belongs to the seller's store before updating
+        const product = await prisma.product.findFirst({
+            where: {
+                id: productId,
+                storeId: storeId,
+            },
+        });
+
+        if (!product) {
+            return NextResponse.json({ error: "Product not found or you don't have permission to edit it." }, { status: 404 });
+        }
+
+        // Update the stock
+        await prisma.product.update({
+            where: { id: productId },
+            data: { stock: stock },
+        });
+
+        return NextResponse.json({ message: "Stock updated successfully" });
+    } catch (error) {
+        console.error("Error updating stock:", error);
+        return NextResponse.json({ error: error.message || "Failed to update stock" }, { status: 500 });
+    }
+}

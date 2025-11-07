@@ -1,6 +1,6 @@
 'use client'
 
-import { addToCart } from "@/lib/features/cart/cartSlice";
+import { addToCart, removeFromCart } from "@/lib/features/cart/cartSlice";
 import { StarIcon, TagIcon, EarthIcon, CreditCardIcon, UserIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -13,6 +13,7 @@ const ProductDetails = ({ product }) => {
     const productId = product.id;
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
 
+    const isOutOfStock = product.stock === 0;
     const cart = useSelector(state => state.cart.cartItems);
     const dispatch = useDispatch();
 
@@ -56,17 +57,28 @@ const ProductDetails = ({ product }) => {
                     <TagIcon size={14} />
                     <p>Save {((product.mrp - product.price) / product.mrp * 100).toFixed(0)}% right now</p>
                 </div>
+                <div className="my-4">
+                    {isOutOfStock ? (
+                        <p className="font-semibold text-red-500">Out of Stock</p>
+                    ) : (
+                        <p className="font-semibold text-green-600">In Stock: {product.stock} available</p>
+                    )}
+                </div>
                 <div className="flex items-end gap-5 mt-10">
                     {
-                        cart[productId] && (
+                        cart[productId] && !isOutOfStock && (
                             <div className="flex flex-col gap-3">
                                 <p className="text-lg text-slate-800 font-semibold">Quantity</p>
-                                <Counter productId={productId} />
+                                <Counter productId={productId} stock={product.stock} />
                             </div>
                         )
                     }
-                    <button onClick={() => !cart[productId] ? addToCartHandler() : router.push('/cart')} className="bg-slate-800 text-white px-10 py-3 text-sm font-medium rounded hover:bg-slate-900 active:scale-95 transition">
-                        {!cart[productId] ? 'Add to Cart' : 'View Cart'}
+                    <button
+                        onClick={() => !cart[productId] ? addToCartHandler() : router.push('/cart')}
+                        disabled={isOutOfStock && !cart[productId]}
+                        className="bg-slate-800 text-white px-10 py-3 text-sm font-medium rounded hover:bg-slate-900 active:scale-95 transition disabled:bg-slate-400 disabled:cursor-not-allowed"
+                    >
+                        {isOutOfStock && !cart[productId] ? 'Out of Stock' : (!cart[productId] ? 'Add to Cart' : 'View Cart')}
                     </button>
                 </div>
                 <hr className="border-gray-300 my-5" />
