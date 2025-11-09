@@ -3,12 +3,29 @@ import { assets } from '@/assets/assets'
 import { ArrowRightIcon, ChevronRightIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import CategoriesMarquee from './CategoriesMarquee'
 
 const Hero = () => {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
+    const rotatingImages = [
+        assets.img1,
+        assets.img2,
+        assets.img3,
+        assets.img4,
+        assets.img5,
+        assets.img7,
+    ];
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % rotatingImages.length);
+        }, 4000); // Change image every 4 seconds
+        return () => clearInterval(interval); // Clear interval on component unmount
+    }, [rotatingImages.length]);
+
+    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₦'
 
     return (
         <div className='mx-6'>
@@ -30,7 +47,7 @@ const Hero = () => {
                             LEARN MORE
                         </Link>
                     </div>
-                    <Image className='sm:absolute bottom-0 right-0 md:right-10 w-full sm:max-w-sm' src={assets.hero_model_img} alt="" />
+                    <Image className='sm:absolute bottom-0 right-0 md:right-10 w-4/5 mx-auto h-48 object-contain sm:object-cover sm:h-auto sm:w-auto sm:max-w-[17rem]' src={rotatingImages[currentImageIndex]} alt="Hero Image" />
                 </div>
                 <div className='flex flex-col md:flex-row xl:flex-col gap-5 w-full xl:max-w-sm text-sm text-slate-600'>
                     <div className='flex-1 flex items-center justify-between w-full bg-orange-200 rounded-3xl p-6 px-8 group'>
@@ -38,14 +55,14 @@ const Hero = () => {
                             <p className='text-3xl font-medium bg-gradient-to-r from-slate-800 to-[#FFAD51] bg-clip-text text-transparent max-w-40'>Best products</p>
                             <p className='flex items-center gap-1 mt-4'>View more <ArrowRightIcon className='group-hover:ml-2 transition-all' size={18} /> </p>
                         </div>
-                        <Image className='w-35' src={assets.hero_product_img1} alt="" />
+                        <Image className='w-35' src={assets.img1} alt="" />
                     </div>
                     <div className='flex-1 flex items-center justify-between w-full bg-blue-200 rounded-3xl p-6 px-8 group'>
                         <div>
                             <p className='text-3xl font-medium bg-gradient-to-r from-slate-800 to-[#78B2FF] bg-clip-text text-transparent max-w-40'>20% discounts</p>
                             <p className='flex items-center gap-1 mt-4'>View more <ArrowRightIcon className='group-hover:ml-2 transition-all' size={18} /> </p>
                         </div>
-                        <Image className='w-35' src={assets.hero_product_img2} alt="" />
+                        <Image className='w-35' src={assets.img10} alt="" />
                     </div>
                 </div>
             </div>

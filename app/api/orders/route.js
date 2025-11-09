@@ -155,33 +155,62 @@ export async function POST(request) {
                 data: {cart: {}}
             });
 
-            // --- Send email notifications for COD orders ---
+            // --- Prepare and send email notifications for COD orders ---
             const buyerName = buyer?.name || 'Customer';
             const buyerEmail = buyer?.email;
+            const notificationPromises = [];
 
-            // Notify the buyer
-            if (buyerEmail) {
-                sendEmail({
-                    to: buyerEmail,
-                    subject: 'Your Bopstore Order has been placed!',
-                    text: `Hi ${buyerName}, thank you for your order! We've received it and the seller(s) will begin processing it shortly.`,
-                    html: `<p>Hi ${buyerName},</p><p>Thank you for your order! We've received it and the seller(s) will begin processing it shortly. You can view your order details in your account.</p>`
-                }).catch(console.error);
-            }
-
-            // Notify each seller
-            for (const [storeId] of ordersByStore.entries()) {
+            // --- Prepare notifications for each seller ---
+            for (const [storeId, sellerItems] of ordersByStore.entries()) {
                 const store = storeDetailsMap.get(storeId);
+                const orderTotal = sellerItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+                // Create a detailed HTML list of items for the email
+                const itemsHtml = `<ul>${sellerItems.map(item => `<li>${item.quantity} x ${productMap.get(item.id)?.name} - ₦${item.price.toFixed(2)}</li>`).join('')}</ul>`;
+
+                // --- Notify the seller ---
                 if (store?.email) {
-                    const messageBody = `Hi ${store.name}, you have a new order from ${buyerName}. Please check your dashboard to process it.`;
-                    sendEmail({
+                    const sellerHtml = `
+                        <p>Hi ${store.name},</p>
+                        <p>You have a new order from ${buyerName}. Please check your dashboard to process it.</p>
+                        <h3>Order Summary:</h3>
+                        ${itemsHtml}
+                        <p><strong>Store Total: ₦${orderTotal.toFixed(2)}</strong></p>
+                        <p>Order details are available in your Bopstore seller dashboard.</p>
+                    `;
+                    notificationPromises.push(sendEmail({
                         to: store.email,
-                        subject: 'You Have a New Order on Bopstore!',
-                        text: messageBody,
-                        html: `<p>Hi ${store.name}, you have a new order from ${buyerName}. Please check your dashboard to process it.</p><p>Order details are available in your Bopstore seller dashboard.</p>`
-                    }).catch(console.error);
+                        subject: `You Have a New Order on Bopstore!`,
+                        html: sellerHtml,
+                        text: `You have a new order from ${buyerName}. Store Total: ₦${orderTotal.toFixed(2)}. Please check your dashboard.`
+                    }));
                 }
             }
+
+            // --- Notify the buyer with a single consolidated email ---
+            if (buyerEmail) {
+                const allItems = Array.from(ordersByStore.values()).flat();
+                const allItemsHtml = `<ul>${allItems.map(item => `<li>${item.quantity} x ${productMap.get(item.id)?.name} - ₦${item.price.toFixed(2)}</li>`).join('')}</ul>`;
+                const grandTotal = allItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+                const buyerHtml = `
+                    <p>Hi ${buyerName},</p>
+                    <p>Thank you for your order! We've received it and the seller(s) will begin processing it shortly.</p>
+                    <h3>Full Order Summary:</h3>
+                    ${allItemsHtml}
+                    <p><strong>Grand Total: ₦${grandTotal.toFixed(2)}</strong></p>
+                    <p>You can view your complete order details in your account.</p>
+                `;
+                notificationPromises.push(sendEmail({
+                    to: buyerEmail,
+                    subject: 'Your Bopstore Order has been placed!',
+                    html: buyerHtml,
+                    text: `Thank you for your order! Grand Total: ₦${grandTotal.toFixed(2)}.`
+                }));
+            }
+
+            // Send all notifications concurrently
+            await Promise.all(notificationPromises).catch(console.error);
         }
 
         return NextResponse.json({message: 'Order placed successfully'});

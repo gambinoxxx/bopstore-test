@@ -11,7 +11,7 @@ import { useAuth, useUser } from "@clerk/nextjs"
 export default function Dashboard() {
 
     const {getToken} = useAuth()
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
+    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₦'
 
     const router = useRouter()
     const { isLoaded } = useUser()

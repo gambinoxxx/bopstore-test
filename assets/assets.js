@@ -16,16 +16,23 @@ import product_img9 from "./product_img9.png"
 import product_img10 from "./product_img10.png"
 import product_img11 from "./product_img11.png"
 import product_img12 from "./product_img12.png"
-import { ClockFadingIcon, HeadsetIcon, SendIcon } from "lucide-react";
+import img1 from "./1.png"
+import img2 from "./2.png"
+import img3 from "./3.png"
+import img4 from "./4.png"
+import img5 from "./5.png"
+import img6 from "./6.png"
+import img7 from "./7.png"
+import img8 from "./8.png"
+import img9 from "./9.png"
+import img10 from "./10.png"
+import { ClockFadingIcon, HeadsetIcon, SendIcon } from "lucide-react"
 import profile_pic1 from "./profile_pic1.jpg"
 import profile_pic2 from "./profile_pic2.jpg"
 import profile_pic3 from "./profile_pic3.jpg"
 
 export const assets = {
-    upload_area, hero_model_img,
-    hero_product_img1, hero_product_img2, gs_logo,
-    product_img1, product_img2, product_img3, product_img4, product_img5, product_img6,
-    product_img7, product_img8, product_img9, product_img10, product_img11, product_img12,
+    upload_area, hero_model_img, hero_product_img1, hero_product_img2, gs_logo, product_img1, product_img2, product_img3, product_img4, product_img5, product_img6, product_img7, product_img8, product_img9, product_img10, product_img11, product_img12, img1, img2, img3, img4, img5, img6,img7, img8, img9, img10
 }
 
 export const categories = ["Headphones", "Speakers", "Watch", "Earbuds", "Mouse", "Decoration"];
