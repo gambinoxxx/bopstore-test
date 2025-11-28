@@ -5,9 +5,10 @@ import { useSelector } from "react-redux";
 import Rating from "./Rating";
 import { useState } from "react";
 import RatingModal from "./RatingModal";
+import { useRouter } from "next/navigation"; 
 
 const OrderItem = ({ order }) => {
-
+    const router = useRouter(); // ✅ Added
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₦';
     const [ratingModal, setRatingModal] = useState(null);
 
@@ -15,7 +16,10 @@ const OrderItem = ({ order }) => {
 
     return (
         <>
-            <tr className="text-sm">
+            <tr 
+                className="text-sm cursor-pointer hover:bg-gray-50 transition-colors" // ✅ Added classes
+                onClick={() => router.push(`/order/${order.id}`)} // ✅ Added click handler
+            >
                 <td className="text-left">
                     <div className="flex flex-col gap-6">
                         {order.orderItems.map((item, index) => (
@@ -36,7 +40,11 @@ const OrderItem = ({ order }) => {
                                     <div>
                                         {ratings.find(rating => order.id === rating.orderId && item.product.id === rating.productId)
                                             ? <Rating value={ratings.find(rating => order.id === rating.orderId && item.product.id === rating.productId).rating} />
-                                            : <button onClick={() => setRatingModal({ orderId: order.id, productId: item.product.id })} className={`text-green-500 hover:bg-green-50 transition ${order.status !== "DELIVERED" && 'hidden'}`}>Rate Product</button>
+                                            : <button onClick={(e) => {
+                                                e.stopPropagation(); // ✅ Prevent row click 
+                                                setRatingModal({ orderId: order.id, productId: item.product.id })
+                                            }} className={`text-green-500 hover:bg-green-50 transition ${order.status !== "DELIVERED" && 'hidden'}`}> Rate Product
+                                            </button>
                                         }</div>
                                     {ratingModal && <RatingModal ratingModal={ratingModal} setRatingModal={setRatingModal} />}
                                 </div>
