@@ -18,7 +18,7 @@ const OrderItem = ({ order }) => {
         <>
             <tr 
                 className="text-sm cursor-pointer hover:bg-gray-50 transition-colors" // ✅ Added classes
-                onClick={() => router.push(`/order/${order.id}`)} // ✅ Added click handler
+                onClick={() => router.push(`/orders/${order.id}`)} // ✅ Added click handler
             >
                 <td className="text-left">
                     <div className="flex flex-col gap-6">
