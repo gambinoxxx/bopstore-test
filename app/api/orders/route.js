@@ -76,7 +76,7 @@ export async function POST(request) {
         const storeIds = Array.from(ordersByStore.keys());
         const stores = await prisma.store.findMany({
             where: { id: { in: storeIds } },
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true, email: true, userId: true }, // Select userId for sellerId
         });
         const storeDetailsMap = new Map(stores.map(s => [s.id, s]));
         const buyer = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
@@ -121,7 +121,31 @@ export async function POST(request) {
             [...orderCreationData.map(data => prisma.order.create({ data })), ...stockUpdateOperations]
         );
 
-        const orderIds = createdOrders.map(order => order.id);
+        // --- ADD ESCROW CREATION LOGIC ---
+        // The first part of the transaction result contains the created orders
+        const actualCreatedOrders = createdOrders.slice(0, orderCreationData.length);
+
+        const escrowCreationPromises = actualCreatedOrders.map(order => {
+            const sellerId = storeDetailsMap.get(order.storeId)?.userId;
+            if (!sellerId) {
+                // This should ideally not happen if the store was found earlier
+                console.error(`Could not find seller for storeId: ${order.storeId}`);
+                return null;
+            }
+            return prisma.escrow.create({
+                data: {
+                    orderId: order.id,
+                    buyerId: userId, // The logged-in user
+                    sellerId: sellerId, // The owner of the store
+                }
+            });
+        });
+
+        // Execute all escrow creation promises
+        await Promise.all(escrowCreationPromises.filter(p => p !== null));
+        // --- END OF ESCROW CREATION LOGIC ---
+
+        const orderIds = actualCreatedOrders.map(order => order.id);
 
         if (paymentMethod === 'PAYSTACK') {
             const paystackInstance = paystack(process.env.PAYSTACK_SECRET_KEY);

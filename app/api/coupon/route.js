@@ -17,13 +17,14 @@ export async function POST(request) {
             return NextResponse.json({error:"coupon not found "}, {status:404});
         }
         if (coupon.forNewUser) {
-            if (!userId) {
-                return NextResponse.json({error:"Please log in to use this coupon."}, {status:401});
-            }
-            const userorders = await prisma.order.findMany({
-                where: {userId}})
+            // If a user is logged in, check if they are a new user.
+            if (userId) {
+                const userorders = await prisma.order.findMany({
+                    where: {userId}
+                });
                 if (userorders.length > 0) {
                     return NextResponse.json({error:"coupon valid for new users only"}, {status:400});
+                }
             }
         }
         if (coupon.forMember && userId) {

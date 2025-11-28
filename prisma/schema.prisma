@@ -21,6 +21,9 @@ model User {
     Address     Address[]
     store       Store?
     buyerOrders Order[]   @relation("BuyerRelation")
+    // Relations for Escrow
+    buyerEscrows  Escrow[]  @relation("BuyerEscrows")
+    sellerEscrows Escrow[]  @relation("SellerEscrows")
 }
 
 // Required for creating a Product: name, description, mrp, price, images, category, storeId
@@ -70,11 +73,35 @@ model Order {
     isCouponUsed  Boolean       @default(false)
     coupon        Json          @default("{}")
     orderItems    OrderItem[]
+    escrow        Escrow? // An order can have one escrow
 
     // Relations
     user    User    @relation("BuyerRelation", fields: [userId], references: [id])
     store   Store   @relation(fields: [storeId], references: [id])
     address Address @relation(fields: [addressId], references: [id])
+}
+
+enum EscrowStatus {
+    PENDING // Funds held, waiting for seller action
+    SHIPPED // Seller has shipped the item
+    DELIVERED // Item delivered, awaiting buyer confirmation
+    RELEASED // Buyer confirmed, funds released to seller
+    DISPUTED // A dispute has been raised
+    CANCELED // Order canceled, funds returned to buyer
+}
+
+model Escrow {
+    id       String       @id @default(cuid())
+    orderId  String       @unique // Each order has one escrow
+    buyerId  String
+    sellerId String
+    status   EscrowStatus @default(PENDING)
+    createdAt DateTime     @default(now())
+    updatedAt DateTime     @updatedAt
+
+    order  Order @relation(fields: [orderId], references: [id])
+    buyer  User  @relation("BuyerEscrows", fields: [buyerId], references: [id])
+    seller User  @relation("SellerEscrows", fields: [sellerId], references: [id])
 }
 
 // Required for creating an OrderItem: orderId, productId, quantity, price
