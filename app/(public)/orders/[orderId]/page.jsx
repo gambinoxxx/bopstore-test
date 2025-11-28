@@ -17,7 +17,7 @@ const OrderDetailPage = () => {
         const fetchEscrowDetails = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`/api/escrow/${orderId}`);
+                const response = await fetch(`/api/escrow/${orderid}`);
                 if (!response.ok) {
                     const err = await response.json();
                     throw new Error(err.error || 'Failed to fetch order details.');
