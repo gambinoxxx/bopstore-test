@@ -1,5 +1,5 @@
 'use client'
-import { PackageIcon, Search, ShoppingCart } from "lucide-react";
+import { PackageIcon, Search, ShoppingCart, Store, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -13,6 +13,9 @@ const Navbar = () => {
 
     const [search, setSearch] = useState('');
     const cartCount = useSelector(state => state.cart.total);
+
+    // Check if the user has the 'is_seller' flag in their public metadata
+    const isSeller = user?.publicMetadata?.is_seller === true;
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -69,6 +72,11 @@ const Navbar = () => {
                             <UserButton afterSignOutUrl="/">
                                 <UserButton.MenuItems>
                                     <UserButton.Action labelIcon={<PackageIcon size={16} />} label="My Orders" onClick={() => router.push('/orders')} />
+                                    {isSeller && (<>
+                                        <UserButton.Action labelIcon={<Store size={16} />} label="My Sales" onClick={() => router.push('/my-sales')} />
+                                        <UserButton.Action labelIcon={<LayoutDashboard size={16} />} label="My Store" onClick={() => router.push('/dashboard')} />
+                                        </>
+                                    )}
                                 </UserButton.MenuItems>
                             </UserButton>
                         )}
@@ -90,6 +98,11 @@ const Navbar = () => {
                                         label="My Orders" 
                                         onClick={() => router.push('/orders')} 
                                     />
+                                    {isSeller && (<>
+                                        <UserButton.Action labelIcon={<Store size={16} />} label="My Sales" onClick={() => router.push('/my-sales')} />
+                                        <UserButton.Action labelIcon={<LayoutDashboard size={16} />} label="My Store" onClick={() => router.push('/dashboard')} />
+                                        </>
+                                    )}
                                 </UserButton.MenuItems>
                             </UserButton>
                         ) : (

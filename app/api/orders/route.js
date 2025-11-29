@@ -252,21 +252,38 @@ export async function GET(request) {
         if (!userId) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
         }
-        const orders = await prisma.order.findMany({
-            // --- BUG FIX: Combined where clauses ---
-            where: {
-                userId,
+
+        const { searchParams } = new URL(request.url);
+        const role = searchParams.get('role');
+
+        let whereClause = {};
+
+        if (role === 'seller') {
+            // Fetch orders where the user is the seller (owner of the store)
+            whereClause = {
+                store: { userId: userId },
                 OR: [
                     { paymentMethod: 'COD' },
                     { paymentMethod: 'PAYSTACK', isPaid: true }
                 ]
-            },
-            include: {
-                orderItems: {include: {product: true}},
-                address: true,
-            },
-            orderBy: {createdAt: 'desc'}
-        })
+            };
+        } else {
+            // Default to fetching orders where the user is the buyer
+            whereClause = {
+                userId: userId,
+                OR: [
+                    { paymentMethod: 'COD' },
+                    { paymentMethod: 'PAYSTACK', isPaid: true }
+                ]
+            };
+        }
+
+        const orders = await prisma.order.findMany({
+            where: whereClause,
+            include: { orderItems: { include: { product: true } }, address: true, user: { select: { name: true } } },
+            orderBy: { createdAt: 'desc' }
+        });
+
         return NextResponse.json({orders});
     } catch (error) {
         console.error(error);

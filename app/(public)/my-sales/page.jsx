@@ -8,33 +8,34 @@ import toast from "react-hot-toast";
 import Loading from "@/components/Loading";
 import { useRouter } from "next/navigation";
 
-export default function Orders() {
+export default function MySales() {
     const { getToken } = useAuth();
     const {user ,isLoaded} =useUser();
-    const [orders, setOrders] = useState([]);
+    const [sales, setSales] = useState([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
 
     useEffect(() => {
-        const fetchOrders = async () => {
+        const fetchSales = async () => {
             try {
                 const token = await getToken();
-                const { data } = await axios.get('/api/orders', {
+                // Note the '?role=seller' query parameter
+                const { data } = await axios.get('/api/orders?role=seller', {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
                 });
-                setOrders(data.orders);
+                setSales(data.orders);
             } catch (error) {
-                toast.error(error?.response?.data?.error || 'Failed to fetch orders');
+                toast.error(error?.response?.data?.error || 'Failed to fetch sales');
             } finally {
                 setLoading(false);
             }
         }
         if (isLoaded){
             if (user){
-                fetchOrders();
+                fetchSales();
             }else{
                 router.push('/'); //redirect to home if not logged in
             }
@@ -47,9 +48,9 @@ export default function Orders() {
 
     return (
         <div className="min-h-[70vh] mx-6">
-            {orders.length > 0 ? (
+            {sales.length > 0 ? (
                 <div className="my-20 max-w-7xl mx-auto">
-                    <PageTitle heading="My Orders" text={`Showing total ${orders.length} orders`} linkText={'Go to home'} />
+                    <PageTitle heading="My Sales" text={`Showing total ${sales.length} sales`} linkText={'Go to home'} />
 
                     <table className="w-full max-w-5xl text-slate-500 table-auto border-separate border-spacing-y-12 border-spacing-x-4">
                         <thead>
@@ -61,12 +62,8 @@ export default function Orders() {
                             </tr>
                         </thead>
                         <tbody>
-                            {orders.map((order) => (
-                                <tr 
-                                    key={order.id} 
-                                    onClick={() => router.push(`/orders/${order.id}`)}
-                                    className="cursor-pointer hover:bg-gray-50"
-                                >
+                            {sales.map((order) => (
+                                <tr key={order.id} onClick={() => router.push(`/orders/${order.id}`)} className="cursor-pointer hover:bg-gray-50">
                                     <OrderItem order={order} key={order.id} />
                                 </tr>
                             ))}
@@ -75,7 +72,7 @@ export default function Orders() {
                 </div>
             ) : (
                 <div className="min-h-[80vh] mx-6 flex items-center justify-center text-slate-400">
-                    <h1 className="text-2xl sm:text-4xl font-semibold">You have no orders</h1>
+                    <h1 className="text-2xl sm:text-4xl font-semibold">You have no sales yet</h1>
                 </div>
             )}
         </div>

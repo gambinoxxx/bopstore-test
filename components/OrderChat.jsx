@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 
-const OrderChat = ({ orderId }) => {
+const OrderChat = ({ orderId, escrowStatus }) => {
     const { user } = useUser();
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
@@ -90,23 +90,29 @@ const OrderChat = ({ orderId }) => {
                 )}
                 <div ref={messagesEndRef} />
             </div>
-            <form onSubmit={handleSendMessage} className="p-4 border-t flex">
-                <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type your message..."
-                    className="flex-grow px-3 py-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={isSending}
-                />
-                <button 
-                    type="submit" 
-                    className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 disabled:bg-blue-300"
-                    disabled={isSending}
-                >
-                    {isSending ? '...' : 'Send'}
-                </button>
-            </form>
+            {escrowStatus === 'RELEASED' ? (
+                <div className="p-4 border-t text-center text-gray-500 bg-gray-100">
+                    This chat has been closed as the transaction is complete.
+                </div>
+            ) : (
+                <form onSubmit={handleSendMessage} className="p-4 border-t flex">
+                    <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Type your message..."
+                        className="flex-grow px-3 py-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        disabled={isSending}
+                    />
+                    <button 
+                        type="submit" 
+                        className="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 disabled:bg-blue-300"
+                        disabled={isSending}
+                    >
+                        {isSending ? '...' : 'Send'}
+                    </button>
+                </form>
+            )}
         </div>
     );
 };

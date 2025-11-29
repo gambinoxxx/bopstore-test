@@ -2,14 +2,14 @@ import prisma from "@/lib/prisma";
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-export async function GET(request, { params }) {
+export async function GET(request, context) {
     try {
         const { userId } = getAuth(request);
         if (!userId) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
-        const { orderId } = params;
+        const { orderId } = context.params;
 
         const escrow = await prisma.escrow.findUnique({
             where: {
@@ -43,14 +43,14 @@ export async function GET(request, { params }) {
     }
 }
 
-export async function PATCH(request, { params }) {
+export async function PATCH(request, context) {
     try {
         const { userId } = getAuth(request);
         if (!userId) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
-        const { orderId } = params;
+        const { orderId } = context.params;
         const { status } = await request.json();
 
         const escrowToUpdate = await prisma.escrow.findUnique({
