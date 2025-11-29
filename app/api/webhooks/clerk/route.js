@@ -1,6 +1,7 @@
 import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import prisma from '@/lib/prisma';
+import { NextResponse } from 'next/server';
 
 export async function POST(req) {
   // You can find this in the Clerk Dashboard -> Webhooks -> choose the webhook
@@ -18,9 +19,7 @@ export async function POST(req) {
 
   // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return new Response('Error occured -- no svix headers', {
-      status: 400
-    });
+    return NextResponse.json({ error: 'Error occurred -- no svix headers' }, { status: 400 });
   }
 
   // Get the body
@@ -41,12 +40,9 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error('Error verifying webhook:', err);
-    return new Response('Error occured', {
-      status: 400
-    });
+    return NextResponse.json({ error: 'Error occurred during webhook verification' }, { status: 400 });
   }
 
-  const { id } = evt.data;
   const eventType = evt.type;
 
   // --- USER CREATED ---
@@ -55,25 +51,30 @@ export async function POST(req) {
       data: {
         id: evt.data.id,
         email: evt.data.email_addresses[0].email_address,
-        name: `${evt.data.first_name} ${evt.data.last_name}`.trim() || 'New User',
+        // Use the full name if available, otherwise default to "New User"
+        name: (`${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim()) || 'New User',
         image: evt.data.image_url,
       },
     });
+    console.log(`User ${evt.data.id} created with name: ${(`${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim()) || 'New User'}`);
   }
 
   // --- USER UPDATED ---
   if (eventType === 'user.updated') {
+    const name = (`${evt.data.first_name || ''} ${evt.data.last_name || ''}`.trim()) || 'New User';
     await prisma.user.update({
       where: { id: evt.data.id },
       data: {
         email: evt.data.email_addresses[0].email_address,
-        name: `${evt.data.first_name} ${evt.data.last_name}`.trim() || 'New User',
+        // Always update the name, even if it's just to the default
+        name: name,
         image: evt.data.image_url,
       },
     });
+    console.log(`User ${evt.data.id} updated with name: ${name}`);
   }
 
-  // We don't handle user.deleted in this example, but you could add it here.
+  // We don't handle user.deleted in this example, but you could add it here if needed.
 
-  return new Response('', { status: 200 });
+  return NextResponse.json({ message: 'Webhook processed successfully' }, { status: 200 });
 }
