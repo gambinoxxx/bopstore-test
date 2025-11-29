@@ -40,7 +40,7 @@ export default function MySales() {
                 router.push('/'); //redirect to home if not logged in
             }
         }
-    }, [isLoaded, user]);
+    }, [isLoaded, user, getToken, router]);
 
     if (!isLoaded || loading) {
         return <Loading />
