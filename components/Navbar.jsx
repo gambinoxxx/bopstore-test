@@ -45,6 +45,10 @@ const Navbar = () => {
                         <Link href="/shop">Shop</Link>
                         <Link href="/">About</Link>
                         <Link href="/">Contact</Link>
+                        {/* Conditionally render My Sales link for sellers */}
+                        {isSeller && (
+                            <Link href="/my-sales" className="font-semibold text-indigo-600">My Sales</Link>
+                        )}
 
                         <form onSubmit={handleSearch} className="hidden xl:flex items-center w-xs text-sm gap-2 bg-slate-100 px-4 py-3 rounded-full">
                             <Search size={18} className="text-slate-600" />

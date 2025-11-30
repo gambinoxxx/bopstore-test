@@ -1,7 +1,6 @@
 'use client'
 import PageTitle from "@/components/PageTitle"
 import { useEffect, useState } from "react";
-import OrderItem from "@/components/OrderItem";
 import { useAuth, useUser } from "@clerk/nextjs";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -39,7 +38,7 @@ export default function Orders() {
                 router.push('/'); //redirect to home if not logged in
             }
         }
-    }, [isLoaded, user]);
+    }, [isLoaded, user, getToken, router]);
 
     if (!isLoaded || loading) {
         return <Loading />
@@ -62,13 +61,24 @@ export default function Orders() {
                         </thead>
                         <tbody>
                             {orders.map((order) => (
-                                <tr 
-                                    key={order.id} 
-                                    onClick={() => router.push(`/orders/${order.id}`)}
-                                    className="cursor-pointer hover:bg-gray-50"
-                                >
-                                    <OrderItem order={order} key={order.id} />
-                                </tr>
+                                <tr key={order.id} onClick={() => router.push(`/orders/${order.id}`)} className="cursor-pointer hover:bg-gray-100 transition-colors duration-200">
+                                    {/* Product Column */}
+                                    <td className="p-4 align-top">
+                                        <div className="font-semibold text-slate-700">
+                                            {order.orderItems[0]?.product?.name || 'Product Name Missing'}
+                                            {order.orderItems.length > 1 && <span className="text-slate-500 font-normal"> + {order.orderItems.length - 1} more</span>}
+                                        </div>
+                                        <div className="text-sm text-slate-500">Order ID: {order.id}</div>
+                                    </td>
+                                    {/* Total Price Column */}
+                                    <td className="p-4 text-center align-top font-semibold text-slate-600">₦{order.total.toFixed(2)}</td>
+                                    {/* Address Column */}
+                                    <td className="p-4 align-top text-sm text-slate-600">{order.address.city}, {order.address.state}</td>
+                                    {/* Status Column */}
+                                    <td className="p-4 align-top">
+                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${order.isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{order.isPaid ? 'Paid' : 'Pending Payment'}</span>
+                                    </td>
+                                </tr> 
                             ))}
                         </tbody>
                     </table>

@@ -5,13 +5,16 @@ import { useUser } from '@clerk/nextjs';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 
-const OrderChat = ({ orderId, escrowStatus }) => {
+const OrderChat = ({ orderId, escrowStatus, isBuyer, orderCreatedAt }) => {
     const { user } = useUser();
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
     const messagesEndRef = useRef(null);
+    
+    const [appealAvailable, setAppealAvailable] = useState(false);
+    const [countdown, setCountdown] = useState('');
 
     // Scroll to the bottom of the chat
     const scrollToBottom = () => {
@@ -42,6 +45,42 @@ const OrderChat = ({ orderId, escrowStatus }) => {
         // Cleanup subscription on unmount
         return () => unsubscribe();
     }, [orderId]);
+
+    // Countdown logic for the appeal button
+    useEffect(() => {
+        if (!isBuyer || !orderCreatedAt) return;
+
+        const appealDeadline = new Date(orderCreatedAt).getTime() + 24 * 60 * 60 * 1000; // 24 hours after creation
+
+        const interval = setInterval(() => {
+            const now = new Date().getTime();
+            const distance = appealDeadline - now;
+
+            if (distance < 0) {
+                setAppealAvailable(true);
+                setCountdown('');
+                clearInterval(interval);
+                return;
+            }
+
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            setCountdown(`${hours}h ${minutes}m ${seconds}s`);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isBuyer, orderCreatedAt]);
+
+    const handleAppeal = () => {
+        const whatsappNumber = 'YOUR_WHATSAPP_NUMBER'; // <-- IMPORTANT: Replace with your number
+        const message = `Hello, I need to appeal an order because the seller is unresponsive.\n\nOrder ID: ${orderId}`;
+        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+        
+        // Open WhatsApp in a new tab
+        window.open(whatsappUrl, '_blank');
+    };
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
@@ -134,6 +173,26 @@ const OrderChat = ({ orderId, escrowStatus }) => {
                         )}
                     </button>
                 </form>
+            )}
+
+            {/* Appeal Section for Buyer */}
+            {isBuyer && escrowStatus !== 'RELEASED' && orderCreatedAt && (
+                <div className="p-4 border-t text-center bg-gray-50">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Need Help?</h4>
+                    {appealAvailable ? (
+                        <>
+                            <p className="text-xs text-gray-500 mb-2">If the seller is not responding, you can appeal to us for assistance.</p>
+                            <button
+                                onClick={handleAppeal}
+                                className="bg-red-500 text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
+                            >
+                                Appeal via WhatsApp
+                            </button>
+                        </>
+                    ) : (
+                        <p className="text-xs text-gray-500">The appeal option will be available in: <span className="font-bold text-gray-600">{countdown}</span></p>
+                    )}
+                </div>
             )}
         </div>
     );

@@ -236,7 +236,12 @@ const OrderDetailPage = () => {
 
                     <div className="mt-8 border-t pt-6">
                         <h2 className="text-xl font-semibold mb-4">Chat with Seller</h2>
-                        <OrderChat orderId={order.id} escrowStatus={status} />
+                        <OrderChat 
+                            orderId={order.id} 
+                            escrowStatus={status}
+                            isBuyer={user?.id === buyer.id}
+                            orderCreatedAt={order.createdAt}
+                        />
                     </div>
                 </div>
             </div>
