@@ -6,10 +6,10 @@ import Rating from "./Rating";
 import { useState } from "react";
 import RatingModal from "./RatingModal";
 import { useRouter } from "next/navigation"; 
+import { formatPrice } from "@/lib/formatPrice";
 
 const OrderItem = ({ order }) => {
     const router = useRouter(); // ✅ Added
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₦';
     const [ratingModal, setRatingModal] = useState(null);
 
     const { ratings } = useSelector(state => state.rating);
@@ -35,7 +35,7 @@ const OrderItem = ({ order }) => {
                                 </div>
                                 <div className="flex flex-col justify-center text-sm">
                                     <p className="font-medium text-slate-600 text-base">{item.product.name}</p>
-                                    <p>{currency}{item.price} Qty : {item.quantity} </p>
+                                    <p>{formatPrice(item.price)} Qty : {item.quantity} </p>
                                     <p className="mb-1">{new Date(order.createdAt).toDateString()}</p>
                                     <div>
                                         {ratings.find(rating => order.id === rating.orderId && item.product.id === rating.productId)
@@ -53,7 +53,7 @@ const OrderItem = ({ order }) => {
                     </div>
                 </td>
 
-                <td className="text-center max-md:hidden">{currency}{order.total}</td>
+                <td className="text-center max-md:hidden">{formatPrice(order.total)}</td>
 
                 <td className="text-left max-md:hidden">
                     <p>{order.address.name}, {order.address.street},</p>

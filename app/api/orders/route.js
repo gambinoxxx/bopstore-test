@@ -9,7 +9,7 @@ export async function POST(request) {
 
 
     try {
-        const {userId ,has } = getAuth(request)
+        const { userId } = getAuth(request)
         if (!userId) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
         }
@@ -36,18 +36,17 @@ export async function POST(request) {
             if (!userId) {
                 return NextResponse.json({error:"Please log in to use this coupon."}, {status:401});
             }
+            // Correctly check for COMPLETED orders only.
             const userorders = await prisma.order.findMany({
-                where: {userId}})
-                if (userorders.length > 0) {
-                    return NextResponse.json({error:"coupon valid for new users only"}, {status:400});
-            }
-        }
-        const hasPlusPlan = has({plan: 'bop_plus'});
-        //check if coupon is avaliable for members
-
-        if (couponCode && coupon.forMember && userId) {
-            if (!hasPlusPlan) {
-                return NextResponse.json({error:"coupon valid for BOP Plus members only"}, {status:400});
+                where: {
+                    userId: userId,
+                    OR: [
+                        { paymentMethod: 'COD' }, // COD orders are considered complete.
+                        { isPaid: true }          // Paid orders (e.g., via Paystack) are complete.
+                    ]
+                }});
+            if (userorders.length > 0) {
+                return NextResponse.json({error:"coupon valid for new users only"}, {status:400});
             }
         }
         //group orders by storeId using a Map
@@ -280,7 +279,16 @@ export async function GET(request) {
 
         const orders = await prisma.order.findMany({
             where: whereClause,
-            include: { orderItems: { include: { product: true } }, address: true, user: { select: { name: true } } },
+            include: { 
+                orderItems: { 
+                    include: { product: true } 
+                }, 
+                address: true, 
+                user: { select: { name: true } },
+                escrow: { // <-- This is the added part
+                    select: { status: true }
+                }
+            },
             orderBy: { createdAt: 'desc' }
         });
 

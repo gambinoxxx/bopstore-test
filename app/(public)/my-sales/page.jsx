@@ -6,6 +6,21 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import Loading from "@/components/Loading";
 import { useRouter } from "next/navigation";
+import { formatPrice } from "@/lib/formatPrice";
+
+const StatusBadge = ({ status, isPaid }) => {
+    const statusMap = {
+        PENDING: { text: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
+        SHIPPED: { text: 'Shipped', className: 'bg-blue-100 text-blue-800' },
+        DELIVERED: { text: 'Delivered', className: 'bg-indigo-100 text-indigo-800' },
+        RELEASED: { text: 'Completed', className: 'bg-green-100 text-green-800' },
+        DISPUTED: { text: 'Disputed', className: 'bg-red-100 text-red-800' },
+    };
+
+    const displayStatus = statusMap[status] || { text: isPaid ? 'Paid' : 'Pending Payment', className: 'bg-gray-100 text-gray-800' };
+
+    return <span className={`px-2 py-1 text-xs font-semibold rounded-full ${displayStatus.className}`}>{displayStatus.text}</span>;
+};
 
 export default function MySales() {
     const { getToken } = useAuth();
@@ -72,13 +87,12 @@ export default function MySales() {
                                         <div className="text-sm text-slate-500">Order ID: {order.id}</div>
                                     </td>
                                     {/* Total Price Column */}
-                                    <td className="p-4 text-center align-top font-semibold text-slate-600">₦{order.total.toFixed(2)}</td>
+                                    <td className="p-4 text-center align-top font-semibold text-slate-600">{formatPrice(order.total)}</td>
                                     {/* Address Column */}
                                     <td className="p-4 align-top text-sm text-slate-600">{order.address.city}, {order.address.state}</td>
                                     {/* Status Column */}
                                     <td className="p-4 align-top">
-                                        {/* This assumes you have an 'escrow' status on the order object, or you might need to fetch it */}
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${order.isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{order.isPaid ? 'Paid' : 'Pending Payment'}</span>
+                                        <StatusBadge status={order.escrow?.status} isPaid={order.isPaid} />
                                     </td>
                                 </tr> 
                             ))}

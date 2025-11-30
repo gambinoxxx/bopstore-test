@@ -3,10 +3,9 @@ import { StarIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
+import { formatPrice } from '@/lib/formatPrice'; // 1. Import the function
 
 const ProductCard = ({ product }) => {
-
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '₦'
 
     // calculate the average rating of the product
     const rating = Math.round(product.rating.reduce((acc, curr) => acc + curr.rating, 0) / product.rating.length);
@@ -25,7 +24,7 @@ const ProductCard = ({ product }) => {
                         ))}
                     </div>
                 </div>
-                <p>{currency}{product.price}</p>
+                <p className="font-semibold">{formatPrice(product.price)}</p>
             </div>
         </Link>
     )

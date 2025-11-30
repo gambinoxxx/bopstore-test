@@ -14,9 +14,6 @@ const Navbar = () => {
     const [search, setSearch] = useState('');
     const cartCount = useSelector(state => state.cart.total);
 
-    // Check if the user has the 'is_seller' flag in their public metadata
-    const isSeller = user?.publicMetadata?.is_seller === true;
-
     const handleSearch = (e) => {
         e.preventDefault();
         // Prevent empty search
@@ -43,12 +40,11 @@ const Navbar = () => {
                     <div className="hidden sm:flex items-center gap-4 lg:gap-8 text-slate-600">
                         <Link href="/">Home</Link>
                         <Link href="/shop">Shop</Link>
-                        <Link href="/">About</Link>
-                        <Link href="/">Contact</Link>
-                        {/* Conditionally render My Sales link for sellers */}
-                        {isSeller && (
+                        {/* Use Protect to reliably show "My Sales" for sellers */}
+                        <Protect condition={(has) => has({ publicMetadata: { is_seller: true } })}>
                             <Link href="/my-sales" className="font-semibold text-indigo-600">My Sales</Link>
-                        )}
+                        </Protect>
+                        <Link href="/">Contact</Link>
 
                         <form onSubmit={handleSearch} className="hidden xl:flex items-center w-xs text-sm gap-2 bg-slate-100 px-4 py-3 rounded-full">
                             <Search size={18} className="text-slate-600" />
@@ -76,11 +72,10 @@ const Navbar = () => {
                             <UserButton afterSignOutUrl="/">
                                 <UserButton.MenuItems>
                                     <UserButton.Action labelIcon={<PackageIcon size={16} />} label="My Orders" onClick={() => router.push('/orders')} />
-                                    {isSeller && (<>
+                                    <Protect condition={(has) => has({ publicMetadata: { is_seller: true } })}>
                                         <UserButton.Action labelIcon={<Store size={16} />} label="My Sales" onClick={() => router.push('/my-sales')} />
                                         <UserButton.Action labelIcon={<LayoutDashboard size={16} />} label="My Store" onClick={() => router.push('/dashboard')} />
-                                        </>
-                                    )}
+                                    </Protect>
                                 </UserButton.MenuItems>
                             </UserButton>
                         )}
@@ -102,11 +97,10 @@ const Navbar = () => {
                                         label="My Orders" 
                                         onClick={() => router.push('/orders')} 
                                     />
-                                    {isSeller && (<>
+                                    <Protect condition={(has) => has({ publicMetadata: { is_seller: true } })}>
                                         <UserButton.Action labelIcon={<Store size={16} />} label="My Sales" onClick={() => router.push('/my-sales')} />
                                         <UserButton.Action labelIcon={<LayoutDashboard size={16} />} label="My Store" onClick={() => router.push('/dashboard')} />
-                                        </>
-                                    )}
+                                    </Protect>
                                 </UserButton.MenuItems>
                             </UserButton>
                         ) : (

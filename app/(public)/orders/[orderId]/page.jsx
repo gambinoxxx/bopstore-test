@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase'; // Import db for Firestore
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'; // Import Firestore functions
 import Loading from '@/components/Loading';
 import OrderChat from '@/components/OrderChat'; // Adjust path if needed
+import { formatPrice } from '@/lib/formatPrice';
 
 const OrderDetailPage = () => {
     const [escrow, setEscrow] = useState(null);
@@ -170,13 +171,13 @@ const OrderDetailPage = () => {
                                     <p className="font-semibold">{item.product.name} (x{item.quantity})</p>
                                     <p className="text-sm text-gray-500">From: {order.store.name}</p>
                                 </div>
-                                <p className="font-semibold">₦{(item.price * item.quantity).toFixed(2)}</p>
+                                <p className="font-semibold">{formatPrice(item.price * item.quantity)}</p>
                             </div>
                         ))}
                     </div>
 
                     <div className="mt-6 text-right">
-                        <p className="text-lg font-bold">Total: ₦{order.total.toFixed(2)}</p>
+                        <p className="text-lg font-bold">Total: {formatPrice(order.total)}</p>
                     </div>
 
                     <div className="mt-8">
