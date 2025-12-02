@@ -4,6 +4,7 @@ import Hero from "@/components/Hero";
 import Newsletter from "@/components/Newsletter";
 import OurSpecs from "@/components/OurSpec";
 import LatestProducts from "@/components/LatestProducts";
+import Faq from "@/components/Faq";
 
 export default function Home() {
     return (
@@ -12,6 +13,7 @@ export default function Home() {
             <LatestProducts />
             <BestSelling />
             <OurSpecs />
+            <Faq />
             <Newsletter />
         </div>
     );

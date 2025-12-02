@@ -24,6 +24,8 @@ model User {
     // Relations for Escrow
     buyerEscrows  Escrow[]  @relation("BuyerEscrows")
     sellerEscrows Escrow[]  @relation("SellerEscrows")
+    paymentSessions PaymentSession[]
+    notifications   Notification[]
 }
 
 // Required for creating a Product: name, description, mrp, price, images, category, storeId
@@ -35,6 +37,9 @@ model Product {
     price       Float
     images      String[]
     category    String
+    specifications Json?   @default("{}")
+    isArchived  Boolean  @default(false)
+    isHotDeal   Boolean  @default(false)
     stock       Int      @default(0)
     storeId     String
     createdAt   DateTime @default(now())
@@ -51,6 +56,7 @@ enum OrderStatus {
     PROCESSING
     SHIPPED
     DELIVERED
+    CANCELLED
 }
 
 enum PaymentMethod {
@@ -62,7 +68,7 @@ enum PaymentMethod {
 model Order {
     id            String        @id @default(cuid())
     total         Float
-    status        OrderStatus   @default(ORDER_PLACED)
+    status        OrderStatus
     userId        String
     storeId       String
     addressId     String
@@ -73,6 +79,7 @@ model Order {
     isCouponUsed  Boolean       @default(false)
     coupon        Json          @default("{}")
     orderItems    OrderItem[]
+    paymentReference String?    @unique
     escrow        Escrow? // An order can have one escrow
 
     // Relations
@@ -167,6 +174,17 @@ model Coupon {
     createdAt   DateTime @default(now())
 }
 
+// Required for creating a Deal
+model Deal {
+    id          String   @id @default(cuid())
+    title       String
+    description String
+    endDate     DateTime
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+}
+
 // Required for creating a Store: userId, name, username, email, contact, logo, description, address (optional: , status, isActive)
 model Store {
     id          String   @id @default(cuid())
@@ -186,5 +204,66 @@ model Store {
 
     Product Product[]
     Order   Order[]
-    user    User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+    user    User      @relation(fields: [userId], references: [id])
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model PaymentSession {
+  id        String   @id @unique
+  userId    String
+  status    PaymentStatus @default(PENDING)
+  amount    Float
+  metadata  Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+enum NotificationType {
+  CHAT_MESSAGE
+  ORDER_UPDATE
+  PAYMENT_CONFIRMED
+  ORDER_SHIPPED
+  ORDER_DELIVERED
+  REVIEW_REQUEST
+  SYSTEM_ALERT
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String           // User who receives the notification
+  type        NotificationType
+  status      NotificationStatus @default(UNREAD)
+  title       String
+  message     String
+  data        Json?            // Additional data like orderId, chatId, etc.
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  // Relations
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([status])
 }

@@ -1,253 +1,203 @@
+// app/api/orders/route.js - UPDATED VERSION
 import prisma from "@/lib/prisma";
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import paystack from "paystack";
-import { sendEmail } from "@/lib/sendNotification";
+import crypto from "crypto";
+
+const paystackInstance = paystack(process.env.PAYSTACK_SECRET_KEY);
 
 export async function POST(request) {
     console.log('CLERK_SECRET_KEY:', process.env.CLERK_SECRET_KEY ? 'Loaded' : 'Not Loaded');
 
-
     try {
-        const { userId } = getAuth(request)
+        const { userId } = getAuth(request);
         if (!userId) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
         }
-        const {addressId, items, couponCode, paymentMethod, totalAmount} = await request.json();
+        
+        // Remove paymentMethod since we only use Paystack now
+        const { addressId, items, couponCode, totalAmount } = await request.json();
 
-        //check if all requred fields are present 
-        if(!addressId || !items || !Array.isArray(items) || !paymentMethod || items.length === 0){
-          return NextResponse.json({ error: 'missing order details' }, { status: 401 });
+        // Check if all required fields are present 
+        if (!addressId || !items || !Array.isArray(items) || items.length === 0) {
+            return NextResponse.json({ error: 'Missing order details' }, { status: 400 });
         }
 
+        // --- VALIDATION PHASE (NO ORDERS CREATED YET) ---
+        
         let coupon = null;
         if (couponCode) {
-           coupon = await prisma.coupon.findUnique({
-            where: {code: couponCode
+            coupon = await prisma.coupon.findUnique({
+                where: { code: couponCode }
+            });
+            
+            if (!coupon) {
+                return NextResponse.json({ error: "Coupon not found" }, { status: 404 });
             }
-        })
-        if (!coupon) {
-            return NextResponse.json({error:"coupon not found "}, {status:404});
-        }
-        }
-        // check if coupon is avaliable for new users 
-        
-        if (couponCode && coupon.forNewUser) {
-            if (!userId) {
-                return NextResponse.json({error:"Please log in to use this coupon."}, {status:401});
-            }
-            // Correctly check for COMPLETED orders only.
-            const userorders = await prisma.order.findMany({
-                where: {
-                    userId: userId,
-                    OR: [
-                        { paymentMethod: 'COD' }, // COD orders are considered complete.
-                        { isPaid: true }          // Paid orders (e.g., via Paystack) are complete.
-                    ]
-                }});
-            if (userorders.length > 0) {
-                return NextResponse.json({error:"coupon valid for new users only"}, {status:400});
+            
+            // Check if coupon is available for new users 
+            if (coupon.forNewUser) {
+                // Only check for completed (paid) orders
+                const userOrders = await prisma.order.findMany({
+                    where: {
+                        userId: userId,
+                        isPaid: true
+                    }
+                });
+                
+                if (userOrders.length > 0) {
+                    return NextResponse.json({ error: "Coupon valid for new users only" }, { status: 400 });
+                }
             }
         }
-        //group orders by storeId using a Map
-        const ordersByStore = new Map()
         
         // --- PERFORMANCE FIX: Fetch all products at once to avoid N+1 problem ---
         const productIds = items.map(item => item.id);
         const products = await prisma.product.findMany({
             where: { id: { in: productIds } }
         });
+        
         const productMap = new Map(products.map(p => [p.id, p]));
-
-        for(const item of items) {
+        
+        // Check stock availability (but don't reduce yet!)
+        for (const item of items) {
             const product = productMap.get(item.id);
             if (!product) {
                 return NextResponse.json({ error: `Product with id ${item.id} not found.` }, { status: 404 });
             }
-            const storeId = product.storeId
+            if (product.stock < item.quantity) {
+                return NextResponse.json({ 
+                    error: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}` 
+                }, { status: 400 });
+            }
+        }
+
+        // Group orders by storeId using a Map
+        const ordersByStore = new Map();
+        
+        for (const item of items) {
+            const product = productMap.get(item.id);
+            const storeId = product.storeId;
+            
             if (!ordersByStore.has(storeId)) {
                 ordersByStore.set(storeId, []);
             }
-            ordersByStore.get(storeId).push({...item, price: product.price});
+            ordersByStore.get(storeId).push({
+                ...item, 
+                price: product.price,
+                productName: product.name
+            });
         }
 
-        // --- NOTIFICATION LOGIC: Get store and buyer details ---
+        // --- Get store and buyer details for metadata ---
         const storeIds = Array.from(ordersByStore.keys());
         const stores = await prisma.store.findMany({
             where: { id: { in: storeIds } },
-            select: { id: true, name: true, email: true, userId: true }, // Select userId for sellerId
+            select: { id: true, name: true, email: true, userId: true },
         });
         const storeDetailsMap = new Map(stores.map(s => [s.id, s]));
-        const buyer = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
-
-        const orderCreationData = [];
-
-        for (const [storeId, sellerItems] of ordersByStore.entries()) {
-            // Calculate total for each store's order without shipping, as it's part of the finalAmount
-            let total = sellerItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-            if (coupon) {
-                total -= (total * coupon.discount) / 100;
-            }
-
-            orderCreationData.push({
-                userId,
-                storeId,
-                addressId,
-                total,
-                paymentMethod,
-                isCouponUsed: !!coupon,
-                coupon: coupon ? coupon : {},
-                orderItems: {
-                    create: sellerItems.map(item => ({
-                        productId: item.id,
-                        quantity: item.quantity,
-                        price: item.price,
-                    }))
-                }
-            });
-        }
-
-        // Prepare stock update operations
-        const stockUpdateOperations = items.map(item =>
-            prisma.product.update({
-                where: { id: item.id },
-                data: { stock: { decrement: item.quantity } },
-            })
-        );
-
-        // --- DATA INTEGRITY FIX: Use a transaction to create orders ---
-        const createdOrders = await prisma.$transaction(
-            [...orderCreationData.map(data => prisma.order.create({ data })), ...stockUpdateOperations]
-        );
-
-        // --- ADD ESCROW CREATION LOGIC ---
-        // The first part of the transaction result contains the created orders
-        const actualCreatedOrders = createdOrders.slice(0, orderCreationData.length);
-
-        const escrowCreationPromises = actualCreatedOrders.map(order => {
-            const sellerId = storeDetailsMap.get(order.storeId)?.userId;
-            if (!sellerId) {
-                // This should ideally not happen if the store was found earlier
-                console.error(`Could not find seller for storeId: ${order.storeId}`);
-                return null;
-            }
-            return prisma.escrow.create({
-                data: {
-                    orderId: order.id,
-                    buyerId: userId, // The logged-in user
-                    sellerId: sellerId, // The owner of the store
-                }
-            });
+        
+        const buyer = await prisma.user.findUnique({ 
+            where: { id: userId }, 
+            select: { name: true, email: true } 
         });
 
-        // Execute all escrow creation promises
-        await Promise.all(escrowCreationPromises.filter(p => p !== null));
-        // --- END OF ESCROW CREATION LOGIC ---
-
-        const orderIds = actualCreatedOrders.map(order => order.id);
-
-        if (paymentMethod === 'PAYSTACK') {
-            const paystackInstance = paystack(process.env.PAYSTACK_SECRET_KEY);
-            const origin = request.headers.get('origin');
-
-            // Find user's email for Paystack
-            const user = await prisma.user.findUnique({ where: { id: userId } });
-            if (!user) {
-                return NextResponse.json({ error: 'User not found' }, { status: 404 });
-            }
-
-            const response = await paystackInstance.transaction.initialize({
-                amount: Math.round(totalAmount * 100), // Use totalAmount from frontend
-                email: user.email,
-                currency: 'NGN', // or 'NGN', 'GHS', 'ZAR'
-                callback_url: `${origin}/verify-payment`,
-                metadata: {
-                    orderIds: orderIds.join(','),
-                    userId,
-                }
-            });
-
-            // The response body from paystack contains the authorization URL
-            return NextResponse.json({ session: response.data });
+        if (!buyer || !buyer.email) {
+            return NextResponse.json({ error: 'User email not found' }, { status: 404 });
         }
 
-        // For non-Paystack (COD) payments, clear the cart and send notifications immediately
-        if (paymentMethod !== 'PAYSTACK') {
-            await prisma.user.update({
-                where: {id: userId},
-                data: {cart: {}}
-            });
+        // Generate unique payment reference
+        const paymentReference = `BOP_${Date.now()}_${userId}_${crypto.randomBytes(4).toString('hex')}`;
 
-            // --- Prepare and send email notifications for COD orders ---
-            const buyerName = buyer?.name || 'Customer';
-            const buyerEmail = buyer?.email;
-            const notificationPromises = [];
+        // --- STORE ORDER DATA IN PAYMENT SESSION (NO ORDERS CREATED!) ---
+        const paymentSessionData = {
+            userId,
+            buyerEmail: buyer.email,
+            buyerName: buyer.name,
+            addressId,
+            items: items.map(item => ({
+                id: item.id,
+                quantity: item.quantity,
+                price: productMap.get(item.id).price,
+                storeId: productMap.get(item.id).storeId,
+                productName: productMap.get(item.id).name
+            })),
+            ordersByStore: Array.from(ordersByStore.entries()).map(([storeId, storeItems]) => ({
+                storeId,
+                items: storeItems.map(item => ({
+                    id: item.id,
+                    quantity: item.quantity,
+                    price: item.price
+                })),
+                total: storeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0),
+                storeDetails: storeDetailsMap.get(storeId)
+            })),
+            coupon: coupon ? {
+                code: coupon.code,
+                discount: coupon.discount,
+                forNewUser: coupon.forNewUser
+            } : null,
+            totalAmount,
+            createdAt: new Date().toISOString(),
+        };
 
-            // --- Prepare notifications for each seller ---
-            for (const [storeId, sellerItems] of ordersByStore.entries()) {
-                const store = storeDetailsMap.get(storeId);
-                const orderTotal = sellerItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-
-                // Create a detailed HTML list of items for the email
-                const itemsHtml = `<ul>${sellerItems.map(item => `<li>${item.quantity} x ${productMap.get(item.id)?.name} - ₦${item.price.toFixed(2)}</li>`).join('')}</ul>`;
-
-                // --- Notify the seller ---
-                if (store?.email) {
-                    const sellerHtml = `
-                        <p>Hi ${store.name},</p>
-                        <p>You have a new order from ${buyerName}. Please check your dashboard to process it.</p>
-                        <h3>Order Summary:</h3>
-                        ${itemsHtml}
-                        <p><strong>Store Total: ₦${orderTotal.toFixed(2)}</strong></p>
-                        <p>Order details are available in your Bopstore seller dashboard.</p>
-                    `;
-                    notificationPromises.push(sendEmail({
-                        to: store.email,
-                        subject: `You Have a New Order on Bopstore!`,
-                        html: sellerHtml,
-                        text: `You have a new order from ${buyerName}. Store Total: ₦${orderTotal.toFixed(2)}. Please check your dashboard.`
-                    }));
-                }
+        // Create payment session (NOT ORDER!)
+        await prisma.paymentSession.create({
+            data: {
+                id: paymentReference,
+                userId,
+                status: 'PENDING',
+                amount: totalAmount,
+                metadata: paymentSessionData,
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000) // Expire in 30 minutes
             }
+        });
 
-            // --- Notify the buyer with a single consolidated email ---
-            if (buyerEmail) {
-                const allItems = Array.from(ordersByStore.values()).flat();
-                const allItemsHtml = `<ul>${allItems.map(item => `<li>${item.quantity} x ${productMap.get(item.id)?.name} - ₦${item.price.toFixed(2)}</li>`).join('')}</ul>`;
-                const grandTotal = allItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-
-                const buyerHtml = `
-                    <p>Hi ${buyerName},</p>
-                    <p>Thank you for your order! We've received it and the seller(s) will begin processing it shortly.</p>
-                    <h3>Full Order Summary:</h3>
-                    ${allItemsHtml}
-                    <p><strong>Grand Total: ₦${grandTotal.toFixed(2)}</strong></p>
-                    <p>You can view your complete order details in your account.</p>
-                `;
-                notificationPromises.push(sendEmail({
-                    to: buyerEmail,
-                    subject: 'Your Bopstore Order has been placed!',
-                    html: buyerHtml,
-                    text: `Thank you for your order! Grand Total: ₦${grandTotal.toFixed(2)}.`
-                }));
+        // Initialize Paystack payment
+        const origin = request.headers.get('origin');
+        const response = await paystackInstance.transaction.initialize({
+            amount: Math.round(totalAmount * 100),
+            email: buyer.email,
+            currency: 'NGN',
+            reference: paymentReference,
+            callback_url: `${origin}/verify-payment?reference=${paymentReference}`,
+            metadata: {
+                paymentReference,
+                userId,
+                addressId,
+                itemsCount: items.length,
+                storeCount: storeIds.length,
+                couponCode: couponCode || null
             }
+        });
 
-            // Send all notifications concurrently
-            await Promise.all(notificationPromises).catch(console.error);
+        // --- IMPORTANT: Validate Paystack response ---
+        if (!response || !response.status || !response.data?.authorization_url) {
+            console.error("Paystack initialization failed. Response:", response);
+            return NextResponse.json({ 
+                error: "Could not connect to payment gateway. Please try again later.",
+                details: response?.message || "No response from Paystack."
+            }, { status: 502 }); // 502 Bad Gateway is appropriate here
         }
 
-        return NextResponse.json({message: 'Order placed successfully'});
+        // Return Paystack authorization URL
+        return NextResponse.json({ 
+            authorization_url: response.data.authorization_url,
+            reference: paymentReference,
+            message: 'Redirect to payment gateway'
+        });
+
     } catch (error) {
-        // Log the full error to the server console for better debugging
-        console.error("Error creating order:", error);
+        console.error("Error initiating payment:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
-//get all orders for a user 
 
+// GET endpoint - UPDATE to only show paid orders
 export async function GET(request) {
     try {
-        const {userId} = getAuth(request);
+        const { userId } = getAuth(request);
         if (!userId) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
         }
@@ -261,19 +211,13 @@ export async function GET(request) {
             // Fetch orders where the user is the seller (owner of the store)
             whereClause = {
                 store: { userId: userId },
-                OR: [
-                    { paymentMethod: 'COD' },
-                    { paymentMethod: 'PAYSTACK', isPaid: true }
-                ]
+                isPaid: true // Only show paid orders
             };
         } else {
             // Default to fetching orders where the user is the buyer
             whereClause = {
                 userId: userId,
-                OR: [
-                    { paymentMethod: 'COD' },
-                    { paymentMethod: 'PAYSTACK', isPaid: true }
-                ]
+                isPaid: true // Only show paid orders
             };
         }
 
@@ -285,16 +229,16 @@ export async function GET(request) {
                 }, 
                 address: true, 
                 user: { select: { name: true } },
-                escrow: { // <-- This is the added part
+                escrow: {
                     select: { status: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        return NextResponse.json({orders});
+        return NextResponse.json({ orders });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({error: error.code || error.message}, {status:400});
+        return NextResponse.json({ error: error.code || error.message }, { status: 400 });
     }
 }
