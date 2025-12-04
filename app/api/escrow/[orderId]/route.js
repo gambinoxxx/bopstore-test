@@ -1,3 +1,4 @@
+// app/api/escrow/[orderId]/route.js - UPDATED
 import prisma from "@/lib/prisma";
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
@@ -6,15 +7,36 @@ export async function GET(req, { params }) {
     try {
         const { userId } = getAuth(req);
         if (!userId) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const { orderId } = params;
 
-        const escrow = await prisma.escrow.findUnique({
-            where: {
-                orderId: orderId,
-            },
+        // First check the order
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                store: {
+                    select: { userId: true }
+                }
+            }
+        });
+
+        if (!order) {
+            return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        }
+
+        // Check if user is authorized (buyer or seller)
+        const isBuyer = order.userId === userId;
+        const isSeller = order.store?.userId === userId;
+        
+        if (!isBuyer && !isSeller) {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+
+        // Get escrow (might not exist)
+        let escrow = await prisma.escrow.findUnique({
+            where: { orderId: orderId },
             include: {
                 buyer: {
                     select: { id: true, name: true, image: true }
@@ -32,74 +54,58 @@ export async function GET(req, { params }) {
             }
         });
 
-        if (!escrow || (escrow.buyerId !== userId && escrow.sellerId !== userId)) {
-            return new NextResponse("Escrow not found or you are not authorized to view it.", { status: 404 });
+        // If no escrow but order is paid, create it
+        if (!escrow && order.isPaid && order.store?.userId) {
+            try {
+                escrow = await prisma.escrow.create({
+                    data: {
+                        orderId: orderId,
+                        buyerId: order.userId,
+                        sellerId: order.store.userId,
+                        status: 'PENDING'
+                    },
+                    include: {
+                        buyer: {
+                            select: { id: true, name: true, image: true }
+                        },
+                        seller: {
+                            select: { id: true, name: true, image: true }
+                        },
+                        order: {
+                            include: {
+                                orderItems: { include: { product: true } },
+                                address: true,
+                                store: true
+                            }
+                        }
+                    }
+                });
+                
+                console.log(`🔄 Created missing escrow for order ${orderId}`);
+                
+            } catch (createError) {
+                console.error(`❌ Failed to create escrow for order ${orderId}:`, createError);
+                // Continue without escrow
+            }
+        }
+
+        if (!escrow) {
+            return NextResponse.json({ 
+                error: 'Escrow not found',
+                order: {
+                    id: order.id,
+                    isPaid: order.isPaid,
+                    status: order.status,
+                    hasStore: !!order.store,
+                    canCreateEscrow: order.isPaid && !!order.store?.userId
+                }
+            }, { status: 404 });
         }
 
         return NextResponse.json(escrow);
+        
     } catch (error) {
         console.error("[ESCROW_GET_ERROR]", error);
-        return new NextResponse("Internal Server Error", { status: 500 });
-    }
-}
-
-export async function PATCH(req, { params }) {
-    try {
-        const { userId } = getAuth(req);
-        if (!userId) {
-            return new NextResponse("Unauthorized", { status: 401 });
-        }
-
-        const { orderId } = params;
-        const { status } = await req.json();
-
-        const escrowToUpdate = await prisma.escrow.findUnique({
-            where: { orderId },
-        });
-
-        if (!escrowToUpdate) {
-            return new NextResponse("Escrow not found.", { status: 404 });
-        }
-
-        let updatedEscrow;
-
-        if (status === 'SHIPPED') {
-            // Security Check: Only the seller can mark the order as shipped.
-            if (escrowToUpdate.sellerId !== userId) {
-                return new NextResponse("Forbidden: You are not the seller for this order.", { status: 403 });
-            }
-            // State Logic: Ensure you can only ship from a PENDING state.
-            if (escrowToUpdate.status !== 'PENDING') {
-                return new NextResponse(`Order cannot be shipped from its current state: ${escrowToUpdate.status}`, { status: 400 });
-            }
-            updatedEscrow = await prisma.escrow.update({ where: { orderId }, data: { status: 'SHIPPED' } });
-        } else if (status === 'DELIVERED') {
-            // Security Check: Only the buyer can mark the order as delivered.
-            if (escrowToUpdate.buyerId !== userId) {
-                return new NextResponse("Forbidden: You are not the buyer for this order.", { status: 403 });
-            }
-            // State Logic: Ensure you can only mark as delivered from a SHIPPED state.
-            if (escrowToUpdate.status !== 'SHIPPED') {
-                return new NextResponse(`Order cannot be marked as delivered from its current state: ${escrowToUpdate.status}`, { status: 400 });
-            }
-            updatedEscrow = await prisma.escrow.update({ where: { orderId }, data: { status: 'DELIVERED' } });
-        } else if (status === 'RELEASED') {
-            // Security Check: Only the buyer can release the funds.
-            if (escrowToUpdate.buyerId !== userId) {
-                return new NextResponse("Forbidden: You are not the buyer for this order.", { status: 403 });
-            }
-            // State Logic: Ensure you can only release funds from a DELIVERED state.
-            if (escrowToUpdate.status !== 'DELIVERED') {
-                return new NextResponse(`Funds cannot be released from the current state: ${escrowToUpdate.status}`, { status: 400 });
-            }
-            updatedEscrow = await prisma.escrow.update({ where: { orderId }, data: { status: 'RELEASED' } });
-        } else {
-            return new NextResponse("Invalid status update.", { status: 400 });
-        }
-
-        return NextResponse.json(updatedEscrow);
-    } catch (error) {
-        console.error("[ESCROW_PATCH_ERROR]", error);
-        return new NextResponse("Internal Server Error", { status: 500 });
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
