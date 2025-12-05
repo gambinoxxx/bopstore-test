@@ -1,8 +1,11 @@
-// app/api/escrow/[orderId]/route.js - UPDATED
 import prisma from "@/lib/prisma";
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
+// =========================================================================
+// GET: Fetch Escrow Details (Existing Logic)
+// Used by the frontend component's initial useEffect to load the data.
+// =========================================================================
 export async function GET(req, { params }) {
     try {
         const { userId } = getAuth(req);
@@ -54,7 +57,7 @@ export async function GET(req, { params }) {
             }
         });
 
-        // If no escrow but order is paid, create it
+        // If no escrow but order is paid, create it (idempotent creation)
         if (!escrow && order.isPaid && order.store?.userId) {
             try {
                 escrow = await prisma.escrow.create({
@@ -62,7 +65,7 @@ export async function GET(req, { params }) {
                         orderId: orderId,
                         buyerId: order.userId,
                         sellerId: order.store.userId,
-                        status: 'PENDING'
+                        status: 'PENDING' // Initial status
                     },
                     include: {
                         buyer: {
@@ -84,8 +87,17 @@ export async function GET(req, { params }) {
                 console.log(`🔄 Created missing escrow for order ${orderId}`);
                 
             } catch (createError) {
+                // This could be a unique constraint violation if two requests tried to create it simultaneously
                 console.error(`❌ Failed to create escrow for order ${orderId}:`, createError);
-                // Continue without escrow
+                // Try fetching it one more time in case it was just created
+                escrow = await prisma.escrow.findUnique({
+                    where: { orderId: orderId },
+                    include: {
+                        buyer: { select: { id: true, name: true, image: true } },
+                        seller: { select: { id: true, name: true, image: true } },
+                        order: { include: { orderItems: { include: { product: true } }, address: true, store: true } }
+                    }
+                });
             }
         }
 
@@ -106,6 +118,99 @@ export async function GET(req, { params }) {
         
     } catch (error) {
         console.error("[ESCROW_GET_ERROR]", error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+// =========================================================================
+// PATCH: Update Escrow Status (New Logic to fix 405 error)
+// Used by handleMarkAsShipped, handleMarkAsDelivered, and handleReleaseFunds.
+// =========================================================================
+export async function PATCH(req, { params }) {
+    try {
+        const { userId } = getAuth(req);
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { orderId } = params;
+        const body = await req.json();
+        const { status: newStatus } = body; // Expecting { status: 'SHIPPED' | 'DELIVERED' | 'RELEASED' }
+
+        // 1. Fetch current order and escrow state
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            include: { store: { select: { userId: true } } }
+        });
+
+        if (!order) {
+            return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+        }
+
+        const currentEscrow = await prisma.escrow.findUnique({
+            where: { orderId: orderId }
+        });
+
+        if (!currentEscrow) {
+             return NextResponse.json({ error: 'Escrow record must exist before updating status' }, { status: 404 });
+        }
+
+        const isBuyer = order.userId === userId;
+        const isSeller = order.store?.userId === userId;
+        const currentStatus = currentEscrow.status;
+
+        // 2. State Transition and Authorization Logic
+        let error = null;
+
+        switch (newStatus) {
+            case 'SHIPPED':
+                if (!isSeller) {
+                    error = 'Only the seller can mark the order as SHIPPED.';
+                } else if (currentStatus !== 'PENDING') {
+                    error = `Cannot transition from ${currentStatus} to SHIPPED.`;
+                }
+                break;
+            case 'DELIVERED':
+                if (!isBuyer) {
+                    error = 'Only the buyer can mark the order as DELIVERED.';
+                } else if (currentStatus !== 'SHIPPED') {
+                    error = `Cannot transition from ${currentStatus} to DELIVERED.`;
+                }
+                break;
+            case 'RELEASED':
+                if (!isBuyer) {
+                    error = 'Only the buyer can release the funds.';
+                } else if (currentStatus !== 'DELIVERED') {
+                    error = `Cannot transition from ${currentStatus} to RELEASED.`;
+                }
+                // NOTE: Implement actual payment/fund release logic here or trigger a background job
+                break;
+            default:
+                error = 'Invalid status transition requested.';
+        }
+
+        if (error) {
+            return NextResponse.json({ error: error }, { status: 403 });
+        }
+
+        // 3. Update the escrow status
+        const updatedEscrow = await prisma.escrow.update({
+            where: { orderId: orderId },
+            data: { status: newStatus },
+            // Include necessary fields for the client to update state
+            include: {
+                buyer: { select: { id: true, name: true, image: true } },
+                seller: { select: { id: true, name: true, image: true } },
+                order: { include: { orderItems: { include: { product: true } }, address: true, store: true } }
+            }
+        });
+
+        console.log(`✅ Escrow ${orderId} status updated to: ${newStatus}`);
+
+        return NextResponse.json(updatedEscrow);
+
+    } catch (error) {
+        console.error("[ESCROW_PATCH_ERROR]", error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
