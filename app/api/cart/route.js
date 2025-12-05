@@ -1,41 +1,33 @@
-// app/api/cart/route.js - SIMPLE WORKING VERSION
-import { getAuth, clerkClient } from "@clerk/nextjs/server"; // Corrected import
-import prisma from "@/lib/prisma";
+// app/api/cart/route.js - FULLY IMPLEMENTED
+import { getAuth, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 
 export async function POST(request) {
     try {
         const { userId } = getAuth(request);
         
         if (!userId) {
-            return NextResponse.json({ 
-                cart: {},
-                success: true,
-                message: 'User not authenticated, cart saved locally'
-            });
+            return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
         }
         
-        const { cart = {} } = await request.json();
+        const body = await request.json();
+        const { cart = {} } = body;
         
         if (typeof cart !== 'object' || cart === null || Array.isArray(cart)) {
-            return NextResponse.json({ 
-                cart: {},
-                success: true,
-                message: 'Invalid cart format'
-            });
+            return NextResponse.json({ error: 'Invalid cart format' }, { status: 400 });
         }
         
-        // Clean cart - remove any invalid values
+        // Sanitize cart data
         const cleanCart = {};
         for (const [productId, quantity] of Object.entries(cart)) {
-            // Only include valid product IDs and positive quantities
             if (productId && typeof quantity === 'number' && quantity >= 0) {
                 cleanCart[productId] = quantity;
             }
         }
         
         console.log(`📦 Saving cart for user ${userId}:`, cleanCart);
-        
+
         // Get user details from Clerk to ensure our DB has the correct info
         const clerkUser = await clerkClient.users.getUser(userId);
         const userName = `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim();
@@ -48,7 +40,7 @@ export async function POST(request) {
             update: {
                 cart: cleanCart,
                 updatedAt: new Date()
-            },
+            }, 
             create: {
                 id: userId,
                 name: userName || 'New User',
@@ -76,12 +68,7 @@ export async function GET(request) {
         const { userId } = getAuth(request);
         
         if (!userId) {
-            // Return empty cart for unauthenticated users
-            return NextResponse.json({ 
-                cart: {},
-                success: true,
-                message: 'User not authenticated, returning empty cart'
-            });
+            return NextResponse.json({ cart: {} });
         }
         
         const user = await prisma.user.findUnique({
@@ -98,23 +85,17 @@ export async function GET(request) {
     } catch (error) {
         console.error("❌ Error loading cart:", error);
         return NextResponse.json({ 
-            success: false,
-            cart: {},
-            error: error.message
+            error: 'Failed to load cart'
         }, { status: 500 });
     }
 }
 
-// Optional: DELETE endpoint to clear cart
 export async function DELETE(request) {
     try {
         const { userId } = getAuth(request);
         
         if (!userId) {
-            return NextResponse.json({ 
-                success: true,
-                message: 'User not authenticated'
-            });
+            return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
         }
         
         console.log(`🗑️ Clearing cart for user ${userId}`);
@@ -125,15 +106,13 @@ export async function DELETE(request) {
         });
         
         return NextResponse.json({ 
-            success: true,
             message: 'Cart cleared successfully'
         });
         
     } catch (error) {
         console.error("❌ Error clearing cart:", error);
         return NextResponse.json({ 
-            success: false,
-            error: error.message
+            error: 'Failed to clear cart'
         }, { status: 500 });
     }
 }

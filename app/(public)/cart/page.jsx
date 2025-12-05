@@ -1,4 +1,4 @@
-// app/(public)/cart/page.jsx - FIXED VERSION
+// app/(public)/cart/page.jsx - FINAL CORRECTED VERSION
 'use client'
 import Counter from "@/components/Counter";
 import OrderSummary from "@/components/OrderSummary";
@@ -9,7 +9,7 @@ import Image from "next/image";
 import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs"; // Use Clerk auth hook
+import { useAuth } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 
 export default function Cart() {
@@ -18,37 +18,13 @@ export default function Cart() {
     const products = useSelector(state => state.product.list);
     
     // Use Clerk auth instead of Redux auth
-    const { isSignedIn, userId } = useAuth();
+    const { isSignedIn } = useAuth();
     
     const dispatch = useDispatch();
     const router = useRouter();
 
     const [cartArray, setCartArray] = useState([]);
     const [totalPrice, setTotalPrice] = useState(0);
-    const [syncingCart, setSyncingCart] = useState(false);
-
-    // Sync cart with backend when it changes (optional - can remove if causing issues)
-    useEffect(() => {
-        if (isSignedIn && userId && Object.keys(cartItems).length > 0) {
-            syncCartWithBackend();
-        }
-    }, [cartItems, isSignedIn, userId]);
-
-    const syncCartWithBackend = async () => {
-        try {
-            setSyncingCart(true);
-            await fetch('/api/cart', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cart: cartItems })
-            });
-        } catch (error) {
-            console.error('Failed to sync cart:', error);
-            // Don't show error to user - cart sync is optional
-        } finally {
-            setSyncingCart(false);
-        }
-    };
 
     const createCartArray = () => {
         let total = 0;
@@ -105,12 +81,6 @@ export default function Cart() {
             <div className="max-w-7xl mx-auto">
                 {/* Title */}
                 <PageTitle heading="My Cart" text="items in your cart" linkText="Add more" />
-
-                {syncingCart && (
-                    <div className="text-sm text-blue-600 mb-4">
-                        Syncing cart with server...
-                    </div>
-                )}
 
                 {/* Not signed in warning */}
                 {!isSignedIn && (

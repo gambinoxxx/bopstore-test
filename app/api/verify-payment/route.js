@@ -53,29 +53,33 @@ export async function POST(request) {
       
       // ========== CRITICAL FIX: Handle processing ==========
       try {
-        // Atomically update from PENDING to prevent race conditions.
-        // We will mark as COMPLETED here and rely on the transaction in createOrdersFromPayment.
+        // Atomically mark as processing to prevent race conditions
         const updatedSession = await prisma.paymentSession.updateMany({
           where: { 
             id: reference,
             status: 'PENDING' // Only update if still PENDING
           },
-          data: { status: 'COMPLETED' } // Mark as completed immediately
+          data: { status: 'PROCESSING' }
         });
 
         // If no rows were updated, another process got to it first.
         if (updatedSession.count === 0) {
           console.log(`⚡ Race condition or stale session: ${reference} was not in PENDING state.`);
-          // Re-fetch to check the current status and return an appropriate message.
           const currentSession = await prisma.paymentSession.findUnique({ where: { id: reference } });
           return NextResponse.json({ 
             verified: true, 
-            message: `Payment already being processed or was completed. Current status: ${currentSession?.status}` 
+            message: `Payment already processed. Current status: ${currentSession?.status}` 
           });
         }
         
         // Create orders
         const createdOrders = await createOrdersFromPayment(reference);
+
+        // Final step: Mark as completed
+        await prisma.paymentSession.update({
+          where: { id: reference },
+          data: { status: 'COMPLETED' }
+        });
         
         return NextResponse.json({ 
           verified: true, 
