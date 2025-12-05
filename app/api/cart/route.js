@@ -1,13 +1,14 @@
-// app/api/cart/route.js - FULLY IMPLEMENTED
-import { getAuth, clerkClient } from "@clerk/nextjs/server";
+import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+// NOTE: Removed 'clerkClient' import to rely only on getAuth
 
 export async function POST(request) {
     try {
         const { userId } = getAuth(request);
         
         if (!userId) {
+            // An unauthenticated user cannot save a cart persistently.
             return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
         }
         
@@ -18,9 +19,10 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid cart format' }, { status: 400 });
         }
         
-        // Sanitize cart data
+        // --- Cart Sanitization (Good Practice) ---
         const cleanCart = {};
         for (const [productId, quantity] of Object.entries(cart)) {
+            // Ensure product ID is present and quantity is a non-negative number
             if (productId && typeof quantity === 'number' && quantity >= 0) {
                 cleanCart[productId] = quantity;
             }
@@ -28,13 +30,8 @@ export async function POST(request) {
         
         console.log(`📦 Saving cart for user ${userId}:`, cleanCart);
 
-        // Get user details from Clerk to ensure our DB has the correct info
-        const clerkUser = await clerkClient.users.getUser(userId);
-        const userName = `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim();
-        const userEmail = clerkUser.emailAddresses.find(e => e.id === clerkUser.primaryEmailAddressId)?.emailAddress;
-        const userImage = clerkUser.imageUrl;
-
-        // Use upsert to either create a new user or update an existing one's cart
+        // Use upsert to either create a new user (with placeholders) or update an existing one's cart.
+        // We avoid clerkClient here and use generic placeholders for user creation.
         const updatedUser = await prisma.user.upsert({
             where: { id: userId },
             update: {
@@ -43,19 +40,21 @@ export async function POST(request) {
             }, 
             create: {
                 id: userId,
-                name: userName || 'New User',
-                email: userEmail || `${userId}@temp.com`,
-                image: userImage || '',
+                // Using placeholders as we are avoiding clerkClient to fetch name/email/image
+                name: 'User Placeholder', 
+                email: `${userId}@placeholder.com`, 
+                image: '',
                 cart: cleanCart,
             }
         });
 
         return NextResponse.json({ 
             cart: updatedUser.cart || {},
-            message: 'Cart saved successfully'
+            message: 'Cart saved successfully (using basic auth).'
         });
         
     } catch (error) {
+        // The console log will still show the original error if it's not a config issue.
         console.error("❌ Error saving cart:", error);
         return NextResponse.json({ 
             error: 'Failed to save cart'
@@ -68,6 +67,7 @@ export async function GET(request) {
         const { userId } = getAuth(request);
         
         if (!userId) {
+            // Unauthenticated users get an empty cart.
             return NextResponse.json({ cart: {} });
         }
         
