@@ -19,24 +19,32 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid cart format' }, { status: 400 });
         }
         
+        // --- NEW LOGGING FOR DEBUGGING ---
+        // This will show exactly what the client sent before any cleaning.
+        console.log(`📦 RAW Input Cart for user ${userId}:`, cart);
+
         // --- Cart Sanitization (Good Practice) ---
         const cleanCart = {};
         for (const [productId, quantity] of Object.entries(cart)) {
             // Ensure product ID is present and quantity is a non-negative number
             if (productId && typeof quantity === 'number' && quantity >= 0) {
                 cleanCart[productId] = quantity;
+            } else {
+                // Log if an item was dropped due to validation failure
+                console.log(`⚠️ Dropped item: Product ID: ${productId}, Quantity: ${quantity} (Type: ${typeof quantity})`);
             }
         }
         
-        console.log(`📦 Saving cart for user ${userId}:`, cleanCart);
+        // Existing log shows the result after sanitization
+        console.log(`📦 Saved (Clean) Cart for user ${userId}:`, cleanCart);
 
         // Use upsert to either create a new user (with placeholders) or update an existing one's cart.
-        // We avoid clerkClient here and use generic placeholders for user creation.
+        // The 'updatedAt: new Date()' line was removed from the 'update' block to fix the Prisma validation error.
         const updatedUser = await prisma.user.upsert({
             where: { id: userId },
             update: {
                 cart: cleanCart,
-                updatedAt: new Date()
+                // Removed: updatedAt: new Date()
             }, 
             create: {
                 id: userId,
