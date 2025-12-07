@@ -6,7 +6,7 @@ import PageTitle from "@/components/PageTitle";
 import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
 import { Trash2Icon } from "lucide-react";
 import Image from "next/image"; 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
@@ -18,7 +18,7 @@ export default function Cart() {
     const products = useSelector(state => state.product.list);
     
     // Use Clerk auth instead of Redux auth
-    const { isSignedIn } = useAuth();
+    const { isSignedIn, userId, getToken } = useAuth();
     
     const dispatch = useDispatch();
     const router = useRouter();
@@ -75,6 +75,46 @@ export default function Cart() {
             createCartArray();
         }
     }, [cartItems, products]);
+
+    // Debounced function to sync cart with the backend
+    const debouncedSyncCart = useCallback(
+        debounce(async (itemsToSync) => {
+            if (!isSignedIn || !userId) return;
+            try {
+                const token = await getToken();
+                await fetch('/api/cart', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ cart: itemsToSync }),
+                });
+                console.log('🛒 Cart synced with backend.');
+            } catch (error) {
+                console.error('Failed to sync cart:', error);
+            }
+        }, 1500), // 1.5-second delay
+        [isSignedIn, userId, getToken]
+    );
+
+    // Effect to trigger the debounced sync when cartItems change
+    useEffect(() => {
+        // Only sync if the user is signed in and the cart isn't empty.
+        if (isSignedIn && Object.keys(cartItems).length > 0) {
+            debouncedSyncCart(cartItems);
+        }
+    }, [cartItems, isSignedIn, debouncedSyncCart]);
+
+    // Helper function for debouncing
+    function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), delay);
+        };
+    }
 
     return cartArray.length > 0 ? (
         <div className="min-h-screen mx-6 text-slate-800">

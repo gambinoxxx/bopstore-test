@@ -79,7 +79,7 @@ model Order {
     isCouponUsed  Boolean       @default(false)
     coupon        Json          @default("{}")
     orderItems    OrderItem[]
-    paymentReference String?    @unique
+    paymentReference String?
     escrow        Escrow? // An order can have one escrow
 
     // Relations

@@ -1,12 +1,14 @@
+
 import prisma from "@/lib/prisma";
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { createNotification } from "@/lib/createNotification";
 
 // =========================================================================
 // GET: Fetch Escrow Details (Existing Logic)
 // Used by the frontend component's initial useEffect to load the data.
 // =========================================================================
-export async function GET(req, { params }) {
+export async function GET(req, { params }) { // Correctly destructure params from the context object
     try {
         const { userId } = getAuth(req);
         if (!userId) {
@@ -206,6 +208,25 @@ export async function PATCH(req, { params }) {
         });
 
         console.log(`✅ Escrow ${orderId} status updated to: ${newStatus}`);
+
+        // 4. Create notifications based on the status change
+        if (newStatus === 'SHIPPED') {
+            await createNotification({
+                userId: order.userId, // Notify the buyer
+                type: 'ORDER_SHIPPED',
+                title: 'Your Order Has Shipped!',
+                message: `Your order #${order.id.substring(0, 8)} is on its way.`,
+                data: { orderId: order.id }
+            });
+        } else if (newStatus === 'DELIVERED') {
+            await createNotification({
+                userId: order.store.userId, // Notify the seller
+                type: 'ORDER_DELIVERED',
+                title: 'Order Delivered',
+                message: `Order #${order.id.substring(0, 8)} has been marked as delivered by the buyer.`,
+                data: { orderId: order.id }
+            });
+        }
 
         return NextResponse.json(updatedEscrow);
 

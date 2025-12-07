@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { useSelector } from "react-redux";
 import { useUser, UserButton, Protect, SignInButton, useAuth } from "@clerk/nextjs";
+import NotificationIcon from "./NotificationIcon"; // Import the new component
 
 const Navbar = () => {
     const { user } = useUser();
@@ -93,6 +94,9 @@ const Navbar = () => {
                             <button className="absolute -top-1 left-3 text-[8px] text-white bg-slate-600 size-3.5 rounded-full">{cartCount}</button>
                         </Link>
 
+                        {/* Notification Icon for Desktop */}
+                        {user && <NotificationIcon />}
+
                         {!user ? (
                             <SignInButton mode="modal">
                                 <button className="px-8 py-2 bg-indigo-500 hover:bg-indigo-600 transition text-white rounded-full">
@@ -116,6 +120,10 @@ const Navbar = () => {
                          <Link href="/cart" className="relative flex items-center gap-2 text-slate-600">
                             <ShoppingCart size={22} />
                             <button className="absolute -top-1 -right-2 text-[8px] text-white bg-slate-600 size-3.5 rounded-full">{cartCount}</button>
+                        </Link>
+                        {/* Notification Icon for Mobile */}
+                        <Link href="/notifications">
+                            {user && <NotificationIcon />}
                         </Link>
                         {/* User Icon / Login Button for Mobile */}
                         {user ? (
