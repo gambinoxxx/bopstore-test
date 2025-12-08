@@ -61,11 +61,11 @@ export default function PublicLayout({ children }) {
 
   // Effect to show toast for new notifications
   useEffect(() => {
-    const currentIds = new Set(notifications.map(n => n.id));
-    
     notifications.forEach(notification => {
-      // If the notification is new and unread, show a toast
-      if (!prevNotificationIds.current.has(notification.id) && notification.status === 'UNREAD') {
+      // Only show a toast for notifications that are UNREAD and have not been seen before.
+      const hasBeenSeen = prevNotificationIds.current.has(notification.id);
+
+      if (!hasBeenSeen && notification.status === 'UNREAD') {
         toast.custom((t) => (
           <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
             <div className="flex-1 w-0 p-4">
@@ -74,10 +74,10 @@ export default function PublicLayout({ children }) {
             </div>
           </div>
         ));
+        // Once the toast is shown, add its ID to the set to prevent it from being shown again.
+        prevNotificationIds.current.add(notification.id);
       }
     });
-
-    prevNotificationIds.current = currentIds; // Always update the ref to the current set of IDs after processing
   }, [notifications]);
 
   return (
