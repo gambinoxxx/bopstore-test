@@ -15,7 +15,8 @@ export async function GET(req, { params }) { // Correctly destructure params fro
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { orderId } = params;
+        // To be robust against build/casing issues, get the first value from the params object.
+        const orderId = Object.values(params)[0];
 
         // First check the order
         const order = await prisma.order.findUnique({
@@ -135,7 +136,8 @@ export async function PATCH(req, { params }) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { orderId } = params;
+        // To be robust against build/casing issues, get the first value from the params object.
+        const orderId = Object.values(params)[0];
         const body = await req.json();
         const { status: newStatus } = body; // Expecting { status: 'SHIPPED' | 'DELIVERED' | 'RELEASED' }
 
