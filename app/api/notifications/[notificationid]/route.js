@@ -9,7 +9,11 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { notificationId } = params;
+    // Correctly access the parameter, accounting for potential casing issues.
+    // The key in the `params` object matches the name of the file segment, which can be case-sensitive.
+    // The error log indicates the server is seeing it as 'notificationid'.
+    // We will access it with the lowercase 'id' to match.
+    const notificationId = params.notificationid; // This is now correct because we renamed the folder.
 
     const notification = await prisma.notification.findFirst({
       where: { id: notificationId, userId },

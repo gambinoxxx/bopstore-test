@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import paystack from 'paystack';
 import prisma from '@/lib/prisma';
 import { createOrdersFromPayment } from '@/lib/payment-utils';
+import { createNotification } from '@/lib/createNotification';
 
 const paystackInstance = paystack(process.env.PAYSTACK_SECRET_KEY);
 
@@ -81,6 +82,16 @@ export async function POST(request) {
           data: { status: 'COMPLETED' }
         });
         
+        // Notify the buyer that their payment was successful
+        await createNotification({
+          userId: paymentSession.userId,
+          type: 'PAYMENT_CONFIRMED',
+          title: 'Payment Successful!',
+          message: `Your payment for ${createdOrders.length} order(s) has been confirmed.`,
+          // We can link to the first created order as a reference point
+          data: { orderId: createdOrders[0]?.id }
+        });
+
         return NextResponse.json({ 
           verified: true, 
           message: 'Payment verified successfully.',

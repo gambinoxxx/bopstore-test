@@ -5,13 +5,14 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { fetchNotifications, markNotificationAsRead } from '@/lib/notificationSlice'; // Corrected path
-import { MessageSquare, ShoppingBag, AlertTriangle, Bell } from 'lucide-react';
+import { MessageSquare, ShoppingBag, AlertTriangle, Bell, CheckCircle } from 'lucide-react';
 import PageTitle from '@/components/PageTitle';
 import Loading from '@/components/Loading';
 
 const notificationIcons = {
   CHAT_MESSAGE: <MessageSquare className="h-5 w-5 text-blue-500" />,
   ORDER_UPDATE: <ShoppingBag className="h-5 w-5 text-green-500" />,
+  PAYMENT_CONFIRMED: <CheckCircle className="h-5 w-5 text-green-600" />,
   SYSTEM_ALERT: <AlertTriangle className="h-5 w-5 text-yellow-500" />,
 };
 

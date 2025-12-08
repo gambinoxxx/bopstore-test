@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuth, useUser } from '@clerk/nextjs';
 import toast, { Toaster } from 'react-hot-toast';
@@ -19,7 +19,7 @@ import { fetchProducts } from "@/lib/features/product/productSlice";
 export default function PublicLayout({ children }) {
   const { user } = useUser();
   const dispatch = useDispatch();
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth(); // Use isSignedIn for a more reliable check
   const notifications = useSelector((state) => state.notifications.list);
   const prevNotificationIds = useRef(new Set());
 
@@ -29,27 +29,27 @@ export default function PublicLayout({ children }) {
   }, [dispatch]);
 
   // Fetch user data when user logs in
-  useEffect(() => {
-    if (user) {
+  useEffect(() => { 
+    if (isSignedIn) { // Switch from `user` to `isSignedIn`
       console.log('👤 User logged in, fetching data...');
       dispatch(fetchCart({ getToken }));
       dispatch(fetchAddress({ getToken }));
       dispatch(fetchUserRatings({ getToken }));
       dispatch(fetchNotifications({ getToken }));
     }
-  }, [user, getToken, dispatch]);
+  }, [isSignedIn, getToken, dispatch]);
 
   // Reset cart when user logs out
   useEffect(() => {
-    if (!user) {
+    if (!isSignedIn) { // Also use isSignedIn here for consistency
       console.log('👤 User logged out, clearing cart...');
       dispatch(clearCart());
-    }
-  }, [user, dispatch]);
+    } 
+  }, [isSignedIn, dispatch]); // Changed dependency from 'user' to 'isSignedIn' for stability
 
   // Poll for new notifications every 30 seconds when the user is logged in
   useEffect(() => {
-    if (user) {
+    if (isSignedIn) {
       const interval = setInterval(() => {
         console.log('🔄 Polling for new notifications...');
         dispatch(fetchNotifications({ getToken }));
@@ -57,7 +57,7 @@ export default function PublicLayout({ children }) {
 
       return () => clearInterval(interval); // Cleanup on unmount or user logout
     }
-  }, [user, getToken, dispatch]);
+  }, [isSignedIn, getToken, dispatch]);
 
   // Effect to show toast for new notifications
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function PublicLayout({ children }) {
       }
     });
 
-    prevNotificationIds.current = currentIds;
+    prevNotificationIds.current = currentIds; // Always update the ref to the current set of IDs after processing
   }, [notifications]);
 
   return (
